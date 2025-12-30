@@ -55,11 +55,10 @@ app.use(
       "https://cjsystem.page.gd",
       "https://www.cjsystem.page.gd"
     ],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    credentials: true
   })
 );
+
 
 
 
