@@ -52,8 +52,8 @@ app.set("trust proxy", 1);
 app.use(
   cors({
     origin: [
-      "https://cjsystem.page.gd",
-      "https://www.cjsystem.page.gd"
+      "https://cjsystem.netlify.app",
+      "https://www.cjsystem.netlify.app"
     ],
     credentials: true
   })
