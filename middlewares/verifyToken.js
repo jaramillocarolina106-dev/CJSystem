@@ -6,6 +6,7 @@ module.exports = async function (req, res, next) {
   try {
     let token = req.cookies?.token;
 
+    // Backup por header
     if (!token && req.headers.authorization) {
       token = req.headers.authorization.split(" ")[1];
     }
@@ -25,17 +26,17 @@ module.exports = async function (req, res, next) {
       return res.status(403).json({ msg: "Usuario desactivado" });
     }
 
-    let empresaFinal = user.empresa;
+    let empresaFinal = user.empresa || null;
 
-    // 🔥 SOLO superadmin puede usar empresaActiva
+    // 🔥 SOLO superadmin puede impersonar empresa
     if (
       user.rol === "superadmin" &&
-      req.cookies?.empresaActiva
+      req.cookies?.empresaActiva &&
+      mongoose.Types.ObjectId.isValid(req.cookies.empresaActiva)
     ) {
       empresaFinal = req.cookies.empresaActiva;
     }
 
-    // 🧠 NORMALIZACIÓN DE ROL
     const rolNormalizado =
       user.rol === "cliente" ? "usuario" : user.rol;
 
@@ -44,12 +45,14 @@ module.exports = async function (req, res, next) {
       nombre: user.nombre,
       email: user.email,
       rol: rolNormalizado,
-      empresa: new mongoose.Types.ObjectId(empresaFinal)
+      empresa: empresaFinal
+        ? new mongoose.Types.ObjectId(empresaFinal)
+        : null
     };
 
     next();
   } catch (err) {
-    console.error(err);
+    console.error("❌ verifyToken error:", err);
     return res.status(401).json({ msg: "Token inválido o expirado" });
   }
 };
