@@ -115,10 +115,12 @@ exports.login = async (req, res) => {
 
 res.cookie("token", token, {
   httpOnly: true,
-  secure: isProd,          // true en Render
-  sameSite: isProd ? "none" : "lax",
+  secure: true,          
+  sameSite: "none",     
+  domain: ".onrender.com", 
   maxAge: 24 * 60 * 60 * 1000
 });
+
 
 
     // 🔥 DEVOLVEMOS BRANDING DESDE EL LOGIN
