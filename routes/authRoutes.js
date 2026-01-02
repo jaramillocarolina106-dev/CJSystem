@@ -13,16 +13,7 @@ const {
 const verifyToken = require("../middlewares/verifyToken");
 const permitRoles = require("../middlewares/permitRoles");
 
-// ==============================
-// RUTAS DE PRUEBA
-// ==============================
-router.get("/login", (req, res) => {
-  res.send("👋 Ruta LOGIN funcionando. Usa POST.");
-});
 
-router.get("/register", (req, res) => {
-  res.send("👋 Ruta REGISTER funcionando. Usa POST.");
-});
 
 // ==============================
 // RUTAS REALES
