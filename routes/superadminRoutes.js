@@ -345,10 +345,12 @@ router.post(
       const empresaId = req.params.id;
 
       // ✅ Guardar empresa activa en cookie
-      res.cookie("empresaActiva", empresaId, {
-        httpOnly: true,
-        sameSite: "lax"
-      });
+     res.cookie("empresaActiva", empresaId, {
+  httpOnly: true,
+  secure: true,
+  sameSite: "none"
+});
+
 
       res.json({ msg: "Empresa seleccionada correctamente" });
 
