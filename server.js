@@ -52,15 +52,17 @@ app.set("trust proxy", 1);
 app.use(
   cors({
     origin: [
+      "http://localhost:3000",
+      "http://127.0.0.1:5500",
       "https://cjsystem.netlify.app",
       "https://www.cjsystem.netlify.app"
     ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   })
 );
-
-
-
+app.options("*", cors());
 
 // =========================
 // 📦 BODY PARSER (UNA SOLA VEZ)
