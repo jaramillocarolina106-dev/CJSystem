@@ -50,24 +50,28 @@ app.use(cookieParser());
 const allowedOrigins = [
   "https://cjsystem.netlify.app",
   "https://www.cjsystem.netlify.app",
+  /\.netlify\.app$/,
   "http://localhost:5000",
   "http://127.0.0.1:5500"
 ];
 
-
 const corsOptions = {
   origin: function (origin, callback) {
-    // Permite Postman / curl
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
+    if (
+      allowedOrigins.some(o =>
+        o instanceof RegExp ? o.test(origin) : o === origin
+      )
+    ) {
       return callback(null, true);
-    } else {
-      return callback(new Error("CORS no permitido: " + origin));
     }
+
+    return callback(new Error("CORS no permitido: " + origin));
   },
   credentials: true
 };
+
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
