@@ -111,11 +111,15 @@ exports.login = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax"
-    });
+   const isProd = process.env.NODE_ENV === "production";
+
+res.cookie("token", token, {
+  httpOnly: true,
+  secure: isProd,          // true en Render
+  sameSite: isProd ? "none" : "lax",
+  maxAge: 24 * 60 * 60 * 1000
+});
+
 
     // 🔥 DEVOLVEMOS BRANDING DESDE EL LOGIN
     res.json({
