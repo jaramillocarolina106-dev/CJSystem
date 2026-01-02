@@ -95,6 +95,8 @@ app.use("/api/usuarios", require("./routes/usuariosRoutes"));
 app.use("/api/config-empresa", configEmpresaRoutes);
 app.use("/api/reportes", require("./routes/reportesRoutes"));
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/superadmin", require("./routes/superadminEmpresaRoutes"));
+
 
 // =========================
 // 📁 ESTÁTICOS
