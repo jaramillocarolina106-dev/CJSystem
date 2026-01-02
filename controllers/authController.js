@@ -111,15 +111,15 @@ exports.login = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-   const isProd = process.env.NODE_ENV === "production";
+   const isProd = true;
 
 res.cookie("token", token, {
   httpOnly: true,
-  secure: true,          
-  sameSite: "none",     
-  domain: ".onrender.com", 
+  secure: true,        
+  sameSite: "none",    
   maxAge: 24 * 60 * 60 * 1000
 });
+
 
 
 
