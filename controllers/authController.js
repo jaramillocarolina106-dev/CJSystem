@@ -111,17 +111,11 @@ exports.login = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-res.cookie("token", token, {
-  httpOnly: true,
-  secure: true,
-  sameSite: "none",
-  domain: ".onrender.com",   
-  path: "/",                 
-  maxAge: 24 * 60 * 60 * 1000
-});
-
-
-
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax"
+    });
 
     // 🔥 DEVOLVEMOS BRANDING DESDE EL LOGIN
     res.json({
@@ -187,13 +181,7 @@ exports.listarUsuarios = async (req, res) => {
 // 📌 LOGOUT
 // ==========================================================
 exports.logout = (req, res) => {
- res.clearCookie("token", {
-  domain: ".onrender.com",
-  path: "/",
-  sameSite: "none",
-  secure: true
-});
-
+  res.clearCookie("token");
   res.clearCookie("empresaActiva"); 
   res.json({ msg: "Sesión cerrada" });
 };
