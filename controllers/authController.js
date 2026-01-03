@@ -101,40 +101,43 @@ exports.login = async (req, res) => {
     // Limpieza por si quedó de una sesión anterior
     res.clearCookie("empresaActiva");
 
-    const token = jwt.sign(
-      {
-        id: user._id,
-        rol: user.rol,
-        empresa: user.empresa?._id || null
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+const token = jwt.sign(
+  {
+    id: user._id,
+    rol: user.rol,
+    empresa: user.empresa?._id || null
+  },
+  process.env.JWT_SECRET,
+  { expiresIn: "1d" }
+);
 
-   const isProd = true;
+const isProd = process.env.NODE_ENV === "production";
 
 res.cookie("token", token, {
   httpOnly: true,
-  secure: true,        
-  sameSite: "none",    
+  secure: isProd,                    
+  sameSite: isProd ? "none" : "lax", 
   maxAge: 24 * 60 * 60 * 1000
 });
 
+res.cookie("token", token, {
+  httpOnly: true,
+  secure: false,     
+  sameSite: "lax",   
+  maxAge: 24 * 60 * 60 * 1000
+});
 
-
-
-    // 🔥 DEVOLVEMOS BRANDING DESDE EL LOGIN
-    res.json({
-      msg: "Login exitoso",
-      usuario: {
-        id: user._id,
-        nombre: user.nombre,
-        email: user.email,
-        rol: user.rol,
-        empresa: user.empresa?._id || null,
-        branding: user.empresa?.branding || null
-      }
-    });
+res.json({
+  msg: "Login exitoso",
+  usuario: {
+    id: user._id,
+    nombre: user.nombre,
+    email: user.email,
+    rol: user.rol,
+    empresa: user.empresa?._id || null,
+    branding: user.empresa?.branding || null
+  }
+});
 
   } catch (err) {
     console.error("❌ ERROR LOGIN:", err);
@@ -182,16 +185,6 @@ exports.listarUsuarios = async (req, res) => {
     res.status(500).json({ msg: "Error listando usuarios" });
   }
 };
-
-// ==========================================================
-// 📌 LOGOUT
-// ==========================================================
-exports.logout = (req, res) => {
-  res.clearCookie("token");
-  res.clearCookie("empresaActiva"); 
-  res.json({ msg: "Sesión cerrada" });
-};
-
 
 // ==========================================================
 // 📌 REGISTRO INICIAL SUPERADMIN (SOLO UNA VEZ)
