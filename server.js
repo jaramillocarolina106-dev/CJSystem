@@ -47,10 +47,12 @@ app.use(cookieParser());
 // 🌐 CORS
 // =========================
 app.use(cors({
-  origin: "https://cjsystem.netlify.app",
+  origin: [
+    "https://cjsystem.netlify.app",
+    "https://cjsystem.page.gd"
+  ],
   credentials: true
 }));
-
 
 // =========================
 // 📦 BODY PARSER
