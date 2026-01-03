@@ -1,5 +1,5 @@
 // =====================================================
-// 🚀 SERVER.JS — CJSystem HelpDesk SaaS (FIX CORS)
+// 🚀 SERVER.JS — CJSystem HelpDesk SaaS
 // =====================================================
 
 const express = require("express");
@@ -11,11 +11,8 @@ const cookieParser = require("cookie-parser");
 const path = require("path");
 require("dotenv").config();
 
-const configEmpresaRoutes = require("./routes/configEmpresaRoutes");
-const dashboardRoutes = require("./routes/dashboardRoutes");
-
 // =========================
-// 🚀 APP
+// 🚀 APP (PRIMERO)
 // =========================
 const app = express();
 
@@ -45,7 +42,7 @@ app.use(
 app.use(cookieParser());
 
 // =========================
-// 🌐 CORS (CONFIG ÚNICA)
+// 🌐 CORS
 // =========================
 const allowedOrigins = [
   "https://cjsystem.netlify.app",
@@ -72,7 +69,6 @@ const corsOptions = {
   credentials: true
 };
 
-
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
@@ -81,6 +77,13 @@ app.options("*", cors(corsOptions));
 // =========================
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// =========================
+// 📁 ESTÁTICOS (DESPUÉS DE app)
+// =========================
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "frontend")));
 
 // =========================
 // 🔌 RUTAS API
@@ -92,17 +95,9 @@ app.use("/api/superadmin", require("./routes/superadminRoutes"));
 app.use("/api/audit", require("./routes/auditRoutes"));
 app.use("/api/branding", require("./routes/brandingRoutes"));
 app.use("/api/usuarios", require("./routes/usuariosRoutes"));
-app.use("/api/config-empresa", configEmpresaRoutes);
+app.use("/api/config-empresa", require("./routes/configEmpresaRoutes"));
 app.use("/api/reportes", require("./routes/reportesRoutes"));
-app.use("/api/dashboard", dashboardRoutes);
-
-
-// =========================
-// 📁 ESTÁTICOS
-// =========================
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use(express.static(path.join(__dirname, "public")));
-app.use(express.static(path.join(__dirname, "frontend")));
+app.use("/api/dashboard", require("./routes/dashboardRoutes"));
 
 // =========================
 // 🧪 PING
@@ -125,5 +120,5 @@ mongoose
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 CJSystem backend corriendo en puerto ${PORT}`);
+  console.log(`🚀 CJSystem backend corriendo en http://localhost:${PORT}`);
 });
