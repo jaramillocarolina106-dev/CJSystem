@@ -111,21 +111,15 @@ const token = jwt.sign(
   { expiresIn: "1d" }
 );
 
-const isProd = process.env.NODE_ENV === "production";
-
 res.cookie("token", token, {
   httpOnly: true,
-  secure: isProd,                    
-  sameSite: isProd ? "none" : "lax", 
+  secure: true,              
+  sameSite: "none",          
+  domain: ".onrender.com",   
   maxAge: 24 * 60 * 60 * 1000
 });
 
-res.cookie("token", token, {
-  httpOnly: true,
-  secure: false,     
-  sameSite: "lax",   
-  maxAge: 24 * 60 * 60 * 1000
-});
+
 
 res.json({
   msg: "Login exitoso",
