@@ -32,7 +32,7 @@ const onlySuperadmin = (req, res, next) => {
 // ============================================================
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "public/logos/");
+    cb(null, "uploads/logos");
   },
   filename: (req, file, cb) => {
     cb(null, "logo-sistema" + path.extname(file.originalname));
@@ -266,7 +266,8 @@ router.put(
 
       // 👇 SI SUBIERON LOGO
       if (req.file) {
-        config.logoURL = "/logos/" + req.file.filename;
+        config.logoURL = "/uploads/logos/" + req.file.filename;
+
       }
 
       await config.save();
@@ -345,11 +346,14 @@ router.post(
       const empresaId = req.params.id;
 
       // ✅ Guardar empresa activa en cookie
-     res.cookie("empresaActiva", empresaId, {
+   res.cookie("empresaActiva", empresaId, {
   httpOnly: true,
   secure: true,
-  sameSite: "none"
+  sameSite: "none",
+  domain: ".onrender.com",
+  maxAge: 24 * 60 * 60 * 1000
 });
+
 
 
       res.json({ msg: "Empresa seleccionada correctamente" });
@@ -369,7 +373,12 @@ router.post(
   verifyToken,
   onlySuperadmin,
   (req, res) => {
-    res.clearCookie("empresaActiva");
+    res.clearCookie("empresaActiva", {
+  domain: ".onrender.com",
+  sameSite: "none",
+  secure: true
+});
+
     res.json({ msg: "Salida de empresa correcta" });
   }
 );
@@ -404,8 +413,9 @@ router.get(
 // ============================================================
 const storageBranding = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "public/empresas/");
-  },
+  cb(null, "uploads/empresas/");
+}
+,
   filename: (req, file, cb) => {
     cb(
       null,
@@ -436,7 +446,8 @@ router.put(
       empresa.branding.colorSecundario = req.body.colorSecundario;
 
       if (req.file) {
-        empresa.branding.logoPath = `/empresas/${req.file.filename}`;
+          empresa.branding.logoPath = `/empresas/${req.file.filename}`;
+          empresa.branding.logoPath = `/uploads/empresas/${req.file.filename}`;
       }
 
       await empresa.save();
