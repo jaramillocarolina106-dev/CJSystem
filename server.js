@@ -16,8 +16,6 @@ require("dotenv").config();
 // =========================
 const app = express();
 
-app.set("trust proxy", 1);
-
 // =========================
 // 🛡️ SEGURIDAD
 // =========================
@@ -46,13 +44,44 @@ app.use(cookieParser());
 // =========================
 // 🌐 CORS
 // =========================
-app.use(cors({
-  origin: [
-    "https://cjsystem.netlify.app",
-    "https://cjsystem.page.gd"
-  ],
+const allowedOrigins = [
+  
+  "https://cjsystemhelpdesk.com",
+  "https://www.cjsystemhelpdesk.com",
+  "https://cjsystem.site",
+  "https://www.cjsystem.site",
+
+
+  "https://cjsystem.netlify.app",
+  "https://www.cjsystem.netlify.app",
+  /\.netlify\.app$/,
+
+  
+  "http://localhost:5000",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500"
+];
+
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+
+    if (
+      allowedOrigins.some(o =>
+        o instanceof RegExp ? o.test(origin) : o === origin
+      )
+    ) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("CORS no permitido: " + origin));
+  },
   credentials: true
-}));
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // =========================
 // 📦 BODY PARSER
