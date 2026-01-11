@@ -141,34 +141,37 @@ urgenciaUsuario: {
       index: true
     },
 
-// ⏱️ SLA
-horasSLA: {
-  type: Number,
-  default: null
+// ------------------------------
+// ⏱️ SLA (ENTERPRISE)
+// ------------------------------
+sla: {
+  horas: {
+    type: Number,
+    default: null
+  },
+  fechaLimite: {
+    type: Date,
+    default: null
+  },
+  alertaEnviada: {
+    type: Boolean,
+    default: false
+  },
+  vencidoNotificado: {
+    type: Boolean,
+    default: false
+  },
+  cumplido: {
+    type: Boolean,
+    default: null
+  },
+  incumplido: {
+    type: Boolean,
+    default: null
+  }
 },
-    // ------------------------------
-    // ⏱️ SLA
-    // ------------------------------
-    fechaLimite: {
-      type: Date,
-      default: null
-    },
 
-    fechaCierre: {
-      type: Date,
-      default: null
-    },
 
-    // 🔔 ALERTAS SLA
-slaAlertaEnviada: {
-  type: Boolean,
-  default: false
-},
-
-slaVencidoNotificado: {
-  type: Boolean,
-  default: false
-},
     // ------------------------------
     // 💬 COMENTARIOS
     // ------------------------------

@@ -26,23 +26,30 @@ const UserSchema = new mongoose.Schema(
     },
 
     password: {
-      type: String,
-      required: true,
-      minlength: 6,
-      select: false
-    },
+  type: String,
+  required: true,
+  minlength: 6,
+  select: false
+},
+
+debeCambiarPassword: {
+  type: Boolean,
+  default: false
+},
 
     rol: {
       type: String,
-      enum: ["superadmin", "admin", "agente", "cliente"],
-      default: "cliente",
+      enum: ["superadmin", "admin", "agente", "usuario"],
+      default: "usuario",
     },
 
     empresa: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Empresa",
-      default: null,
-    },
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Empresa",
+  required: function () {
+    return this.rol !== "superadmin";
+  }
+},
 
     avatar: {
       type: String,
@@ -63,6 +70,8 @@ const UserSchema = new mongoose.Schema(
   {
     timestamps: true
   }
+
+  
 );
 
 // 🔐 HASH AUTOMÁTICO

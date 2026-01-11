@@ -1,48 +1,73 @@
 // models/AuditLog.js
 const mongoose = require("mongoose");
 
+const auditLogSchema = new mongoose.Schema(
+  {
+    accion: {
+      type: String,
+      required: true,
+      uppercase: true, 
+      index: true
+    },
 
+    detalle: {
+      type: String,
+      default: null
+    },
 
-const auditLogSchema = new mongoose.Schema({
-  accion: {
-    type: String,
-    required: true
+    severidad: {
+      type: String,
+      enum: ["baja", "media", "alta"],
+      default: "media",
+      index: true
+    },
+
+    usuario: {
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        index: true
+      },
+      nombre: String,
+      email: String,
+      rol: String
+    },
+
+    empresa: {
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Empresa",
+        index: true
+      },
+      nombre: String
+    },
+
+    ip: {
+      type: String,
+      default: "—"
+    },
+
+    userAgent: {
+      type: String,
+      default: "—"
+    },
+
+    // Fecha explícita (útil para queries directas)
+    fecha: {
+      type: Date,
+      default: Date.now,
+      index: true
+    }
   },
-  detalle: String,
-
-  severidad: {
-    type: String,
-    enum: ["baja", "media", "alta"],
-    default: "media"
-  },
-
-  usuario: {
-  id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  nombre: String,
-  email: String,
-  rol: String
-  },
-
-  empresa: {
-    id: { type: mongoose.Schema.Types.ObjectId, ref: "Empresa" },
-    nombre: String
-  },
-
-  ip: String,
-  userAgent: String,
-
-  fecha: {
-    type: Date,
-    default: Date.now
+  {
+    timestamps: true // createdAt / updatedAt (PRO)
   }
-});
+);
 
 /* =========================
-   📌 ÍNDICES DE AUDITORÍA
+   📌 ÍNDICES COMPUESTOS
 ========================= */
 auditLogSchema.index({ "empresa.id": 1, fecha: -1 });
 auditLogSchema.index({ "usuario.id": 1, fecha: -1 });
-auditLogSchema.index({ accion: 1 });
-auditLogSchema.index({ severidad: 1 });
 
 module.exports = mongoose.model("AuditLog", auditLogSchema);
