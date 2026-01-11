@@ -187,26 +187,38 @@ if (
     }
   }
 
-  /* ======================================================
-     🧠 SLA GLOBAL
-  ====================================================== */
- const ticketsSLA = await Ticket.find({
-  ...filtroBase,
-  "sla.fechaLimite": { $ne: null },
-  fechaCierre: { $ne: null }
-});
-
-let cumplidos = 0;
-
-ticketsSLA.forEach(t => {
-  if (t.fechaCierre <= t.sla.fechaLimite) {
-    cumplidos++;
+/* ======================================================
+   🧠 SLA GLOBAL
+====================================================== */
+const slaAgg = await Ticket.aggregate([
+  {
+    $match: {
+      ...filtroBase,
+      estado: "cerrado",
+      asignadoA: { $ne: null },
+      "sla.fechaLimite": { $exists: true }
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      total: { $sum: 1 },
+      cumplidos: {
+        $sum: {
+          $cond: [{ $eq: ["$sla.cumplido", true] }, 1, 0]
+        }
+      }
+    }
   }
-});
+]);
 
-const porcentajeSLA = ticketsSLA.length
-  ? Math.round((cumplidos / ticketsSLA.length) * 100)
-  : 100;
+const sla = slaAgg[0] || { total: 0, cumplidos: 0 };
+
+const porcentajeSLA =
+  sla.total > 0
+    ? Math.round((sla.cumplidos / sla.total) * 100)
+    : 100;
+
 
 
 /* ======================================================
