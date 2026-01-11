@@ -2,54 +2,102 @@
 const AuditLog = require("../models/AuditLog");
 const Empresa = require("../models/Empresa");
 
+/**
+ * 📌 Registro de auditoría centralizado
+ * Uso:
+ * await audit({
+ *   req,
+ *   accion: "RESET_PASSWORD_ADMIN",
+ *   detalle: "Admin restableció contraseña",
+ *   severidad: "alta" // opcional
+ * });
+ */
 module.exports = async ({ req, accion, detalle, severidad = "media" }) => {
   try {
-    // =========================
-    // 🌐 IP REAL DEL CLIENTE
-    // =========================
+    /* =========================
+       🔧 NORMALIZAR ACCIÓN
+    ========================= */
+    const accionFinal = accion?.toUpperCase?.() || "ACCION_DESCONOCIDA";
+
+    /* =========================
+       🔥 SEVERIDAD AUTOMÁTICA
+    ========================= */
+    const severidadPorAccion = {
+      RESET_PASSWORD_ADMIN: "alta",
+      BLOQUEO_PASSWORD: "alta",
+      CAMBIO_PASSWORD_USUARIO: "media",
+      LOGIN_FALLIDO: "media",
+      USUARIO_DESACTIVADO: "alta"
+    };
+
+    const severidadFinal =
+      severidadPorAccion[accionFinal] || severidad;
+
+    /* =========================
+       🌐 IP REAL DEL CLIENTE
+    ========================= */
     const ip =
-      req.headers["x-forwarded-for"]?.split(",")[0] ||
-      req.socket.remoteAddress ||
-      req.ip;
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      req.ip ||
+      "—";
 
-    const userAgent = req.headers["user-agent"] || "—";
+    const userAgent =
+      req.headers["user-agent"] || "—";
 
-    // =========================
-    // 🏢 EMPRESA REAL
-    // =========================
-    let empresaData = null;
+    /* =========================
+       👤 SNAPSHOT DE USUARIO
+    ========================= */
+    const usuarioData = req.user
+      ? {
+          id: req.user.id,
+          nombre: req.user.nombre,
+          email: req.user.email,
+          rol:
+            req.user.rol === "cliente"
+              ? "usuario"
+              : req.user.rol
+        }
+      : null;
 
-    if (req.user?.empresa) {
-      const empresa = await Empresa.findById(req.user.empresa).lean();
-      if (empresa) {
-        empresaData = {
-          id: empresa._id,
-          nombre: empresa.nombre
-        };
-      }
-    }
+/* =========================
+   🏢 SNAPSHOT DE EMPRESA (MULTI-EMPRESA REAL)
+========================= */
+let empresaId =
+  req.headers["x-empresa-activa"] &&
+  req.headers["x-empresa-activa"] !== "null"
+    ? req.headers["x-empresa-activa"]
+    : req.user?.empresa || null;
 
-    await AuditLog.create({
-      accion,
-      detalle,
-      severidad,
+let empresaData = null;
 
-      usuario: req.user
-  ? {
-      id: req.user.id,
-      nombre: req.user.nombre,
-      email: req.user.email,
-      rol: req.user.rol
-    }
-  : null,
+if (empresaId) {
+  const empresa = await Empresa.findById(empresaId).lean();
+  if (empresa) {
+    empresaData = {
+      id: empresa._id,
+      nombre: empresa.nombre
+    };
+  }
+}
 
 
-      empresa: empresaData,
-      ip,
-      userAgent
-    });
+    /* =========================
+       🧾 GUARDAR AUDITORÍA
+    ========================= */
+  await AuditLog.create({
+  accion: accionFinal,
+  detalle,
+  severidad: severidadFinal,
+  usuario: usuarioData,
+  empresa: empresaData,
+  ip,
+  userAgent
+});
+
 
   } catch (err) {
+    // ❗ La auditoría NUNCA debe romper el flujo principal
     console.error("❌ Error audit log:", err.message);
   }
 };
