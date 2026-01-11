@@ -10,15 +10,39 @@ const verifyToken = require("../middlewares/verifyToken");
 const permitRoles = require("../middlewares/permitRoles");
 const upload = require("../middlewares/upload");
 const { getDashboardMetrics } = require("../services/dashboardMetrics");
+const requireEmpresaActiva = require("../middlewares/requireEmpresaActiva");
 
-
+router.get(
+  "/",
+  verifyToken,
+  permitRoles("admin", "agente", "superadmin"),
+  requireEmpresaActiva,
+  ctrl.listar
+);
 
 // =======================================================
-// 🔵 RUTA DE PRUEBA
+// 👤 MIS TICKETS — USUARIO FINAL
 // =======================================================
-router.get("/test", (req, res) => {
-  res.send("👋 Ruta TICKETS funcionando correctamente 💙");
-});
+router.get(
+  "/mis-tickets",
+  verifyToken,
+  permitRoles("usuario"),
+  requireEmpresaActiva,
+  async (req, res) => {
+    try {
+      const tickets = await Ticket.find({
+        empresa: req.user.empresa,
+        creadoPor: req.user.id
+      }).sort({ createdAt: -1 });
+
+      res.json(tickets);
+    } catch (err) {
+      console.error("❌ Error mis tickets usuario:", err);
+      res.status(500).json({ msg: "Error cargando tus tickets" });
+    }
+  }
+);
+
 
 // =======================================================
 // 📊 DASHBOARD — ESTADÍSTICAS BÁSICAS
@@ -101,11 +125,6 @@ router.post(
 );
 
 // =======================================================
-// 📋 LISTAR TICKETS
-// =======================================================
-router.get("/", verifyToken, ctrl.listar);
-
-// =======================================================
 // 📊 SLA POR AGENTE
 // =======================================================
 router.get(
@@ -114,26 +133,29 @@ router.get(
   permitRoles("admin", "agente", "superadmin"),
   async (req, res) => {
     try {
-      // 🔑 Empresa activa
       let empresaId = req.user.empresa;
       if (req.user.rol === "superadmin" && req.cookies.empresaActiva) {
         empresaId = req.cookies.empresaActiva;
       }
 
-      // Solo tickets con SLA y agente asignado
       const tickets = await Ticket.find({
         empresa: empresaId,
+        estado: "cerrado",
         asignadoA: { $ne: null },
-        fechaLimite: { $ne: null }
-      }).populate("asignadoA");
+        "sla.fechaLimite": { $exists: true }
+      }).populate("asignadoA", "nombre");
 
       const porAgente = {};
 
       tickets.forEach(t => {
-        const id = t.asignadoA._id.toString();
+        const agente = t.asignadoA;
+        if (!agente) return;
+
+        const id = agente._id.toString();
+
         if (!porAgente[id]) {
           porAgente[id] = {
-            nombre: t.asignadoA.nombre,
+            nombre: agente.nombre,
             total: 0,
             enSla: 0,
             vencidos: 0
@@ -142,10 +164,10 @@ router.get(
 
         porAgente[id].total++;
 
-        if (t.fechaCierre && new Date(t.fechaCierre) <= new Date(t.fechaLimite)) {
-          porAgente[id].enSla++;
-        } else if (t.fechaCierre && new Date(t.fechaCierre) > new Date(t.fechaLimite)) {
+        if (t.sla?.incumplido) {
           porAgente[id].vencidos++;
+        } else {
+          porAgente[id].enSla++;
         }
       });
 
@@ -154,7 +176,9 @@ router.get(
         total: a.total,
         enSla: a.enSla,
         vencidos: a.vencidos,
-        sla: a.total > 0 ? Math.round((a.enSla / a.total) * 100) : 0
+        sla: a.total > 0
+          ? Math.round((a.enSla / a.total) * 100)
+          : 100
       }));
 
       res.json(resultado);
@@ -288,6 +312,59 @@ router.put(
 );
 
 
+// =======================================================
+// ♻️ RECALCULAR SLA (ADMIN)
+// =======================================================
+router.put(
+  "/recalcular-sla",
+  verifyToken,
+  permitRoles("admin", "superadmin"),
+  requireEmpresaActiva,
+  async (req, res) => {
+    try {
+      const empresaId = req.user.empresa;
+
+      const tickets = await Ticket.find({
+        empresa: empresaId,
+        estado: { $in: ["abierto", "en_progreso"] },
+        asignadoA: { $ne: null }
+      });
+
+      let actualizados = 0;
+
+      for (const t of tickets) {
+        const horas = await require("../services/slaService").obtenerHorasSLA(
+          empresaId,
+          t.prioridad
+        );
+
+        const fechaLimite = await require("../services/slaService").calcularFechaLimite(
+          empresaId,
+          horas
+        );
+
+        t.sla = {
+          horas,
+          fechaLimite,
+          alertaEnviada: false,
+          vencidoNotificado: false
+        };
+
+        await t.save();
+        actualizados++;
+      }
+
+      res.json({
+        msg: "SLA recalculado correctamente",
+        total: actualizados
+      });
+
+    } catch (err) {
+      console.error("❌ Error recalculando SLA:", err);
+      res.status(500).json({ msg: "Error recalculando SLA" });
+    }
+  }
+);
 
 
 module.exports = router;

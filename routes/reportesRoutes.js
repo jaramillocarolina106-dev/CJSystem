@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const permitRoles = require("../middlewares/permitRoles");
 const verifyToken = require("../middlewares/verifyToken");
+const requireEmpresaActiva = require("../middlewares/requireEmpresaActiva");
+
 
 // 🔵 GLOBAL (superadmin)
 const {
@@ -28,7 +30,7 @@ router.get(
    📊 EXCEL GLOBAL (solo superadmin)
 ===================================================== */
 router.get(
-  "/global/excel",
+  "/global/exportar-excel",
   verifyToken,
   permitRoles("superadmin"),
   reporteGlobalExcel
@@ -41,6 +43,7 @@ router.get(
   "/empresa/pdf",
   verifyToken,
   permitRoles("admin", "superadmin"),
+  requireEmpresaActiva,
   reporteEmpresaPDF
 );
 

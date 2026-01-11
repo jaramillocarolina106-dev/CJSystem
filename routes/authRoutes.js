@@ -7,8 +7,11 @@ const {
   login,
   listarUsuarios,
   perfil,
-  registerSuperadmin
+  registerSuperadmin,
+  resetPasswordAdmin,
+  cambiarPasswordObligatorio
 } = require("../controllers/authController");
+
 
 const verifyToken = require("../middlewares/verifyToken");
 const permitRoles = require("../middlewares/permitRoles");
@@ -94,7 +97,14 @@ router.put(
 );
 
 
+router.put(
+  "/usuarios/:id/reset-password",
+  verifyToken,
+  permitRoles("admin", "superadmin"),
+  resetPasswordAdmin
+);
 
+router.post("/cambiar-password-obligatorio", cambiarPasswordObligatorio);
 
 
 // REGISTRO INICIAL SUPERADMIN (solo dev)

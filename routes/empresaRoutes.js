@@ -95,5 +95,15 @@ router.put(
   uploadLogo.single("logo"), // ⬅️ AQUÍ VA MULTER
   empresaCtrl.guardarBranding
 );
+// =====================================================
+// 🚪 ENTRAR A EMPRESA (SUPERADMIN)
+// =====================================================
+router.post(
+  "/:id/entrar",
+  verifyToken,
+  permitRoles("superadmin"),
+  empresaCtrl.entrarEmpresa
+);
+
 
 module.exports = router;
