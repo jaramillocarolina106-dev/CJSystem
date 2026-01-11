@@ -9,8 +9,34 @@ async function getDashboardMetrics(
   tipoFiltro = "normal"
 ) {
 
-  try {
+  // 🔒 NORMALIZACIÓN FUERTE
+  if (
+    !empresaId ||
+    empresaId === "null" ||
+    empresaId === "undefined" ||
+    !mongoose.Types.ObjectId.isValid(empresaId)
+  ) {
+    empresaId = null;
+  }
 
+  try {
+const empresaObjectId = empresaId
+  ? new mongoose.Types.ObjectId(empresaId)
+  : null;
+
+
+function mergeFecha(filtroBase, extra) {
+  if (!filtroBase.createdAt) return extra;
+
+  return {
+    $gte: extra.$gte
+      ? (filtroBase.createdAt.$gte > extra.$gte
+          ? filtroBase.createdAt.$gte
+          : extra.$gte)
+      : filtroBase.createdAt.$gte,
+    $lte: filtroBase.createdAt.$lte
+  };
+}
 
 
   /* ======================================================
@@ -18,7 +44,9 @@ async function getDashboardMetrics(
   ====================================================== */
   const filtroBase = {};
 
-  if (empresaId) filtroBase.empresa = empresaId;
+if (empresaObjectId) {
+  filtroBase.empresa = empresaObjectId;
+}
 
   if (filtros.desde && filtros.hasta) {
     filtroBase.createdAt = {
@@ -60,6 +88,7 @@ let hoy = null;
 let semana = null;
 let mes = null;
 
+
 // ===== HOY =====
 if (
   tipoFiltro === "normal" ||
@@ -70,7 +99,9 @@ if (
 ) {
   hoy = await Ticket.countDocuments({
     ...filtroBase,
-    createdAt: { $gte: new Date(new Date().setHours(0,0,0,0)) }
+    createdAt: mergeFecha(filtroBase, {
+      $gte: new Date(new Date().setHours(0,0,0,0))
+    })
   });
 }
 
@@ -83,7 +114,9 @@ if (
 ) {
   semana = await Ticket.countDocuments({
     ...filtroBase,
-    createdAt: { $gte: new Date(Date.now() - 7 * 86400000) }
+    createdAt: mergeFecha(filtroBase, {
+      $gte: new Date(Date.now() - 7 * 86400000)
+    })
   });
 }
 
@@ -95,9 +128,12 @@ if (
 ) {
   mes = await Ticket.countDocuments({
     ...filtroBase,
-    createdAt: { $gte: new Date(Date.now() - 30 * 86400000) }
+    createdAt: mergeFecha(filtroBase, {
+      $gte: new Date(Date.now() - 30 * 86400000)
+    })
   });
 }
+
 
 
   /* ======================================================
@@ -154,34 +190,39 @@ if (
   /* ======================================================
      🧠 SLA GLOBAL
   ====================================================== */
-  const ticketsSLA = await Ticket.find({
-    ...filtroBase,
-    fechaLimite: { $ne: null },
-    fechaCierre: { $ne: null }
-  });
+ const ticketsSLA = await Ticket.find({
+  ...filtroBase,
+  "sla.fechaLimite": { $ne: null },
+  fechaCierre: { $ne: null }
+});
 
-  let cumplidos = 0;
-  ticketsSLA.forEach(t => {
-    if (t.fechaCierre <= t.fechaLimite) cumplidos++;
-  });
+let cumplidos = 0;
 
-  const porcentajeSLA = ticketsSLA.length
-    ? Math.round((cumplidos / ticketsSLA.length) * 100)
-    : 100;
+ticketsSLA.forEach(t => {
+  if (t.fechaCierre <= t.sla.fechaLimite) {
+    cumplidos++;
+  }
+});
+
+const porcentajeSLA = ticketsSLA.length
+  ? Math.round((cumplidos / ticketsSLA.length) * 100)
+  : 100;
+
 
 /* ======================================================
    🧑‍💼 SLA POR AGENTE 
 ====================================================== */
 const slaMatch = {
   asignadoA: { $ne: null },
-  fechaLimite: { $ne: null },
+  "sla.fechaLimite": { $ne: null },
   fechaCierre: { $ne: null }
 };
 
-// 🔥 OJO AQUÍ: empresa como ObjectId explícito
-if (empresaId) {
-  slaMatch.empresa = new mongoose.Types.ObjectId(empresaId);
+
+if (empresaObjectId) {
+  slaMatch.empresa = empresaObjectId;
 }
+
 
 if (filtros.desde && filtros.hasta) {
   slaMatch.createdAt = {
@@ -198,7 +239,12 @@ const slaRaw = await Ticket.aggregate([
       total: { $sum: 1 },
       cumplidos: {
         $sum: {
-          $cond: [{ $lte: ["$fechaCierre", "$fechaLimite"] }, 1, 0]
+          $cond: [
+  { $lte: ["$fechaCierre", "$sla.fechaLimite"] },
+  1,
+  0
+]
+
         }
       }
     }

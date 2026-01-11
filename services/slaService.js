@@ -1,5 +1,6 @@
 const ConfigEmpresa = require("../models/ConfigEmpresa");
 const ConfigGlobal = require("../models/ConfigGlobal");
+const { esFestivo } = require("./festivosService");
 
 // ===============================
 // ⏱ OBTENER HORAS SLA
@@ -43,24 +44,29 @@ async function calcularFechaLimite(empresaId, horasSLA) {
     activo: true
   }).lean();
 
-  
-const horarioSemanal = cfgEmpresa?.horarioSemanal;
-const tipoHorario = cfgEmpresa?.tipoHorario;
+  const horarioSemanal = cfgEmpresa?.horarioSemanal;
+  const tipoHorario = cfgEmpresa?.tipoHorario;
+  const trabajaFestivos = cfgEmpresa?.trabajaFestivos === true;
 
-// 🟢 1️⃣ EMPRESA 24x7 → horas corridas
-if (!horarioSemanal || tipoHorario === "24x7") {
-  const fecha = new Date();
-  fecha.setHours(fecha.getHours() + horasSLA);
-  return fecha;
-}
-
-
-  // 🟡 2️⃣ HORARIO LABORAL → horas hábiles
+  // ⏱ Inicialización correcta
   let fecha = new Date();
   let minutosPendientes = horasSLA * 60;
 
+  // 🟢 24x7 → horas corridas
+  if (!horarioSemanal || tipoHorario === "24x7") {
+    fecha.setMinutes(fecha.getMinutes() + minutosPendientes);
+    return fecha;
+  }
+
+  // 🧠 Horario laboral inteligente
   while (minutosPendientes > 0) {
     fecha.setMinutes(fecha.getMinutes() + 1);
+
+    // 🚫 Festivos
+    if (!trabajaFestivos) {
+      const festivo = await esFestivo(fecha);
+      if (festivo) continue;
+    }
 
     if (!esDiaLaboral(fecha, horarioSemanal)) continue;
     if (!dentroDeHorario(fecha, horarioSemanal)) continue;
