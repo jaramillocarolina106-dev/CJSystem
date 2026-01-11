@@ -4,17 +4,39 @@
 
 const User = require("../models/User");
 
-/**
- * 🧠 Util — obtener empresa activa desde req.user
- */
+// ============================================================
+// 🧠 UTIL — EMPRESA ACTIVA (HEADER-BASED)
+// ============================================================
 const getEmpresaId = (req, res) => {
-  const empresaId = req.user?.empresa;
-  if (!empresaId) {
-    res.status(400).json({ msg: "Usuario sin empresa activa" });
+  let empresaId = req.user?.empresa;
+  const empresaHeader = req.headers["x-empresa-activa"];
+
+  if (
+    empresaHeader &&
+    empresaHeader !== "null" &&
+    req.user?.rol !== "superadmin"
+  ) {
+    res.status(403).json({ msg: "No autorizado" });
     return null;
   }
+
+  if (
+    req.user?.rol === "superadmin" &&
+    empresaHeader &&
+    empresaHeader !== "null"
+  ) {
+    empresaId = empresaHeader;
+  }
+
+  if (!empresaId || empresaId === "null") {
+    res.status(400).json({ msg: "Empresa no definida" });
+    return null;
+  }
+
   return empresaId;
 };
+
+
 
 /**
  * ============================================================
@@ -24,6 +46,10 @@ const getEmpresaId = (req, res) => {
  * ============================================================
  */
 exports.listarUsuariosInternosEscalado = async (req, res) => {
+  if (!["agente", "admin", "superadmin"].includes(req.user.rol)) {
+  return res.status(403).json({ msg: "No autorizado" });
+}
+
   try {
     const empresaId = getEmpresaId(req, res);
     if (!empresaId) return;
@@ -80,6 +106,10 @@ exports.listarAgentesEmpresa = async (req, res) => {
  */
 exports.listarUsuariosEmpresa = async (req, res) => {
   try {
+    if (!["admin", "superadmin"].includes(req.user.rol)) {
+      return res.status(403).json({ msg: "No autorizado" });
+    }
+
     const empresaId = getEmpresaId(req, res);
     if (!empresaId) return;
 
@@ -97,6 +127,7 @@ exports.listarUsuariosEmpresa = async (req, res) => {
     res.status(500).json({ msg: "Error cargando usuarios" });
   }
 };
+
 /**
  * ============================================================
  * 👥 LISTAR USUARIOS FINALES (AGENTE / ADMIN)
@@ -113,11 +144,11 @@ exports.listarUsuariosFinalesEmpresa = async (req, res) => {
       return res.status(403).json({ msg: "No autorizado" });
     }
 
-    const usuarios = await User.find({
-      empresa: empresaId,
-      rol: { $in: ["cliente", "usuario"] },
-      activo: { $ne: false }
-    })
+   const usuarios = await User.find({
+  empresa: empresaId,
+  rol: "usuario",
+  activo: { $ne: false }
+})
       .select("_id nombre email")
       .sort({ nombre: 1 });
 
@@ -128,31 +159,4 @@ exports.listarUsuariosFinalesEmpresa = async (req, res) => {
     res.status(500).json({ msg: "Error cargando usuarios finales" });
   }
 };
-/**
- * ============================================================
- * 👤 LISTAR USUARIOS FINALES (CLIENTES)
- * 👉 Usado por: admin y agente al crear ticket
- * ============================================================
- */
-exports.listarUsuariosFinales = async (req, res) => {
-  try {
-    const empresaId = req.user.empresa;
-    if (!empresaId) {
-      return res.status(400).json({ msg: "Usuario sin empresa" });
-    }
 
-    const usuarios = await User.find({
-      empresa: empresaId,
-      rol: "cliente",
-      activo: { $ne: false }
-    })
-      .select("_id nombre email")
-      .sort({ nombre: 1 });
-
-    res.json(usuarios);
-
-  } catch (err) {
-    console.error("❌ Error usuarios finales:", err);
-    res.status(500).json({ msg: "Error cargando usuarios" });
-  }
-};

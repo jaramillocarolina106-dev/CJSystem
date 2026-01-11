@@ -4,17 +4,25 @@
 
 const ConfigEmpresa = require("../models/ConfigEmpresa");
 
-// =======================================================
-// 🧠 UTIL — EMPRESA ACTIVA
-// =======================================================
+
 const getEmpresaId = (req, res) => {
   let empresaId = req.user?.empresa;
+  const empresaHeader = req.headers["x-empresa-activa"];
 
-  if (req.user.rol === "superadmin" && req.cookies?.empresaActiva) {
-    empresaId = req.cookies.empresaActiva;
+  if (empresaHeader && empresaHeader !== "null" && req.user?.rol !== "superadmin") {
+    res.status(403).json({ msg: "No autorizado" });
+    return null;
   }
 
-  if (!empresaId) {
+  if (
+    req.user?.rol === "superadmin" &&
+    empresaHeader &&
+    empresaHeader !== "null"
+  ) {
+    empresaId = empresaHeader;
+  }
+
+  if (!empresaId || empresaId === "null") {
     res.status(400).json({ msg: "No hay empresa activa" });
     return null;
   }
@@ -22,41 +30,41 @@ const getEmpresaId = (req, res) => {
   return empresaId;
 };
 
+
 // =======================================================
 // 📥 OBTENER CONFIGURACIÓN
 // =======================================================
 exports.obtenerConfigEmpresa = async (req, res) => {
   try {
     const empresaId = getEmpresaId(req, res);
-    if (!empresaId) return;
+if (!empresaId) return;
+
 
     const config = await ConfigEmpresa.findOne({ empresa: empresaId }).lean();
 
-    // 🆕 CONFIG POR DEFECTO (NO CREA REGISTRO)
     if (!config) {
       return res.json({
-  sla: { alta: null, media: null, baja: null },
-  tipoHorario: "lv", 
-  horarioSemanal: {
-    lunes:     { activo: true,  inicio: "08:00", fin: "17:00" },
-    martes:    { activo: true,  inicio: "08:00", fin: "17:00" },
-    miercoles: { activo: true,  inicio: "08:00", fin: "17:00" },
-    jueves:    { activo: true,  inicio: "08:00", fin: "17:00" },
-    viernes:   { activo: true,  inicio: "08:00", fin: "16:00" },
-    sabado:    { activo: false, inicio: null,    fin: null },
-    domingo:   { activo: false, inicio: null,    fin: null }
-  },
-  trabajaFestivos: false
-});
-
+        sla: { alta: null, media: null, baja: null },
+        tipoHorario: "lv",
+        horarioSemanal: {
+          lunes:     { activo: true,  inicio: "08:00", fin: "17:00" },
+          martes:    { activo: true,  inicio: "08:00", fin: "17:00" },
+          miercoles: { activo: true,  inicio: "08:00", fin: "17:00" },
+          jueves:    { activo: true,  inicio: "08:00", fin: "17:00" },
+          viernes:   { activo: true,  inicio: "08:00", fin: "16:00" },
+          sabado:    { activo: false, inicio: null,    fin: null },
+          domingo:   { activo: false, inicio: null,    fin: null }
+        },
+        trabajaFestivos: false
+      });
     }
 
-   res.json({
-  sla: config.sla,
-  tipoHorario: config.tipoHorario,
-  horarioSemanal: config.horarioSemanal,
-  trabajaFestivos: config.trabajaFestivos
-});
+    res.json({
+      sla: config.sla,
+      tipoHorario: config.tipoHorario,
+      horarioSemanal: config.horarioSemanal,
+      trabajaFestivos: config.trabajaFestivos
+    });
 
   } catch (err) {
     console.error("❌ Error obtener config empresa:", err);
@@ -64,27 +72,29 @@ exports.obtenerConfigEmpresa = async (req, res) => {
   }
 };
 
+
 // =======================================================
 // 💾 GUARDAR / ACTUALIZAR CONFIGURACIÓN
 // =======================================================
 exports.guardarConfigEmpresa = async (req, res) => {
   try {
     const empresaId = getEmpresaId(req, res);
-    if (!empresaId) return;
+if (!empresaId) return;
+
 
     const { sla = {}, horarioSemanal = {}, tipoHorario } = req.body;
 
-    const update = {
-  empresa: empresaId,
+  const update = {
+  empresa: empresaId, 
   tipoHorario: tipoHorario || "24x7",
   sla: {
     alta: sla.alta ?? null,
     media: sla.media ?? null,
     baja: sla.baja ?? null
   },
-  horarioSemanal
+  horarioSemanal,
+  trabajaFestivos: req.body.trabajaFestivos ?? false
 };
-
 
     const config = await ConfigEmpresa.findOneAndUpdate(
       { empresa: empresaId },
@@ -102,3 +112,4 @@ exports.guardarConfigEmpresa = async (req, res) => {
     res.status(500).json({ msg: "Error guardando configuración" });
   }
 };
+

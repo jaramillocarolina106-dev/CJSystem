@@ -12,7 +12,18 @@ const fs = require("fs");
 // ============================================================
 exports.listarAuditoria = async (req, res) => {
   try {
+    if (["cliente", "usuario"].includes(req.user.rol)) {
+      return res.status(403).json({ msg: "No autorizado" });
+    }
+
+    const empresaId = req.empresaActiva;
+
     const filtros = {};
+
+if (empresaId) {
+  filtros["empresa.id"] = empresaId;
+}
+
 
     if (req.query.desde || req.query.hasta) {
       filtros.fecha = {};
@@ -30,18 +41,30 @@ exports.listarAuditoria = async (req, res) => {
       .limit(500);
 
     res.json(logs);
+
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error auditoría:", err);
     res.status(500).json({ msg: "Error listando auditoría" });
   }
 };
+
 
 // ============================================================
 // 📊 EXPORTAR EXCEL — AUDITORÍA (ENTERPRISE / ISO)
 // ============================================================
 exports.exportarExcel = async (req, res) => {
   try {
+    if (["cliente", "usuario"].includes(req.user.rol)) {
+      return res.status(403).json({ msg: "No autorizado" });
+    }
+
+    const empresaId = req.empresaActiva;
     const filtros = {};
+
+    // 👑 Superadmin puede ver todo
+    if (empresaId) {
+      filtros["empresa.id"] = empresaId;
+    }
 
     if (req.query.desde || req.query.hasta) {
       filtros.fecha = {};
@@ -54,74 +77,37 @@ exports.exportarExcel = async (req, res) => {
     }
 
     const logs = await AuditLog.find(filtros)
-      .populate("usuario", "nombre email")
-      .populate("empresa", "nombre")
       .sort({ fecha: -1 });
-
 
     const wb = new ExcelJS.Workbook();
     wb.creator = "CJSystem";
     wb.created = new Date();
 
-    const headerStyle = {
-      font: { bold: true, color: { argb: "FFFFFFFF" } },
-      alignment: { vertical: "middle" },
-      fill: {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF1B2F70" }
-      },
-      border: {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" }
-      }
-    };
-
-    const ws = wb.addWorksheet("Auditoría", {
-      views: [{ state: "frozen", ySplit: 1 }]
-    });
+    const ws = wb.addWorksheet("Auditoría");
 
     ws.columns = [
       { header: "Fecha", key: "fecha", width: 22 },
       { header: "Usuario", key: "usuario", width: 28 },
-      { header: "Correo", key: "correo", width: 32 },
       { header: "Empresa", key: "empresa", width: 28 },
       { header: "Acción", key: "accion", width: 28 },
       { header: "Detalle", key: "detalle", width: 40 },
-      { header: "IP", key: "ip", width: 20 },
-      { header: "Severidad", key: "severidad", width: 16 }
+      { header: "Severidad", key: "severidad", width: 16 },
+      { header: "IP", key: "ip", width: 20 }
     ];
 
-    ws.getRow(1).eachCell(c => (c.style = headerStyle));
-
     logs.forEach(l => {
-  ws.addRow({
-    fecha: new Date(l.fecha).toLocaleString(),
+      ws.addRow({
+        fecha: new Date(l.fecha).toLocaleString(),
+        usuario: l.usuario?.nombre || "Sistema",
+        empresa: l.empresa?.nombre || "Global",
+        accion: l.accion,
+        detalle: l.detalle || "",
+        severidad: l.severidad,
+        ip: l.ip === "::1" ? "Localhost" : l.ip
+      });
+    });
 
-    usuario: l.usuario?.nombre || "Sistema",
-
-    correo: l.usuario?.email
-      ? l.usuario.email
-      : "No aplica",
-
-    empresa: l.empresa?.nombre || "Sistema / Global",
-
-    accion: l.accion,
-
-    detalle: l.detalle || "",
-
-    ip: l.ip === "::1"
-      ? "Localhost"
-      : (l.ip || "-").replace("::ffff:", ""),
-
-    severidad: l.severidad
-  });
-});
-
-
-    ws.autoFilter = "A1:H1";
+    const buffer = await wb.xlsx.writeBuffer();
 
     res.setHeader(
       "Content-Type",
@@ -132,14 +118,14 @@ exports.exportarExcel = async (req, res) => {
       "attachment; filename=auditoria-cjsystem.xlsx"
     );
 
-    await wb.xlsx.write(res);
-    res.end();
+    res.send(buffer);
 
   } catch (err) {
     console.error("❌ Error exportando Excel auditoría:", err);
     res.status(500).json({ msg: "Error exportando Excel" });
   }
 };
+
 
 // ============================================================
 // 📄 EXPORTAR PDF — AUDITORÍA (ENTERPRISE / ISO / ESTABLE)
@@ -148,7 +134,21 @@ exports.exportarPDF = async (req, res) => {
   let doc;
 
   try {
-    const filtros = {};
+   if (req.user.rol === "cliente" || req.user.rol === "usuario") {
+  return res.status(403).json({ msg: "No autorizado" });
+}
+
+
+const empresaId = req.empresaActiva;
+
+
+const filtros = {};
+
+if (empresaId) {
+  filtros["empresa.id"] = empresaId;
+}
+
+
 
     if (req.query.desde || req.query.hasta) {
       filtros.fecha = {};
@@ -345,18 +345,43 @@ exports.exportarPDF = async (req, res) => {
 // ============================================================
 exports.dashboardAuditoria = async (req, res) => {
   try {
-    const totalEventos = await AuditLog.countDocuments();
+    // 🔒 Solo superadmin
+    if (req.user.rol !== "superadmin") {
+      return res.status(403).json({ msg: "No autorizado" });
+    }
 
-    const accionesTop = await AuditLog.aggregate([
-      { $group: { _id: "$accion", total: { $sum: 1 } } },
+    // 📊 Total de eventos (TODAS las empresas)
+    const total = await AuditLog.countDocuments();
+
+    // 📅 Eventos de hoy
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const hoyCount = await AuditLog.countDocuments({
+      fecha: { $gte: hoy }
+    });
+
+    // 📈 Acciones más frecuentes (GLOBAL)
+    const acciones = await AuditLog.aggregate([
+      {
+        $group: {
+          _id: "$accion",
+          total: { $sum: 1 }
+        }
+      },
       { $sort: { total: -1 } },
       { $limit: 5 }
     ]);
 
-    res.json({ totalEventos, accionesTop });
+    res.json({
+      total,
+      hoy: hoyCount,
+      acciones
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Error dashboard auditoría" });
+    console.error("❌ Error dashboard auditoría global:", err);
+    res.status(500).json({ msg: "Error dashboard global" });
   }
 };
 
@@ -365,13 +390,9 @@ exports.dashboardAuditoria = async (req, res) => {
 // ============================================================
 exports.dashboardAuditoriaEmpresa = async (req, res) => {
   try {
-    const { empresaId } = req.params;
-
-    // 🔒 VALIDACIÓN DE SEGURIDAD
-    if (!mongoose.Types.ObjectId.isValid(empresaId)) {
-      return res.status(400).json({
-        msg: "ID de empresa inválido"
-      });
+    const empresaId = req.params.empresaId;
+    if (!empresaId) {
+      return res.status(400).json({ msg: "Empresa requerida" });
     }
 
     const empresaObjectId = new mongoose.Types.ObjectId(empresaId);
@@ -389,17 +410,8 @@ exports.dashboardAuditoriaEmpresa = async (req, res) => {
     });
 
     const acciones = await AuditLog.aggregate([
-      {
-        $match: {
-          "empresa.id": empresaObjectId
-        }
-      },
-      {
-        $group: {
-          _id: "$accion",
-          total: { $sum: 1 }
-        }
-      },
+      { $match: { "empresa.id": empresaObjectId } },
+      { $group: { _id: "$accion", total: { $sum: 1 } } },
       { $sort: { total: -1 } }
     ]);
 

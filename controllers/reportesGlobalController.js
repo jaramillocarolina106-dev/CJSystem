@@ -7,15 +7,10 @@ const fs = require("fs");
 const Empresa = require("../models/Empresa");
 const User = require("../models/User");
 const Ticket = require("../models/Ticket");
-let getDashboardMetrics;
+const { getDashboardMetrics } = require("../services/dashboardMetrics");
 
-async function loadMetrics() {
-  if (!getDashboardMetrics) {
-    const mod = await import("../services/dashboardMetrics.js");
-    getDashboardMetrics = mod.default.getDashboardMetrics;
 
-  }
-}
+
 
 
 
@@ -50,14 +45,16 @@ function generarGrafica(config) {
 ============================================================ */
 exports.reporteGlobalPDF = async (req, res) => {
 
+
+
   // 🎨 Colores globales del reporte
   const azul = "#4b7bff";       // azul principal CJSystem
   
   let doc;
   try {
 
-    await loadMetrics();
     const metrics = await getDashboardMetrics();
+
 
     /* =========================
        CONSULTA: TICKETS POR EMPRESA
@@ -515,15 +512,21 @@ doc.end();
    📊 EXCEL GLOBAL ENTERPRISE — CJSystem HelpDesk SaaS (PREMIUM)
 ============================================================ */
 exports.reporteGlobalExcel = async (req, res) => {
+
+  
+
   try {
-    await loadMetrics();
+    
     const metrics = await getDashboardMetrics();
     const now = new Date();
 
     /* =========================
        🎫 TICKETS COMPLETOS
     ========================= */
-    const tickets = await Ticket.find()
+    const tickets = await Ticket.find({
+  createdAt: { $gte: new Date(Date.now() - 365 * 86400000) }
+})
+
       .populate("empresa", "nombre")
       .populate("creadoPor", "nombre apellido email")
       .populate("asignadoA", "nombre apellido")

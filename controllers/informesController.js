@@ -12,6 +12,9 @@ const archiver = require("archiver");
 const fs = require("fs");
 const path = require("path");
 
+
+
+
 // ======================================================
 // 🟦 FUNCIONES AUXILIARES
 // ======================================================
@@ -33,8 +36,10 @@ const f = (fecha) =>
 exports.informeMensualPDF = async (req, res) => {
   try {
    
-    const empresa = await Empresa.findById(empresaId);
-    const tickets = await Ticket.find({ empresa: empresaId });
+    const empresaId = req.empresaActiva;
+
+const empresa = await Empresa.findById(empresaId);
+const tickets = await Ticket.find({ empresa: empresaId });
 
     const abiertos = tickets.filter(t => t.estado === "abierto").length;
     const progreso = tickets.filter(t => t.estado === "en_progreso").length;
@@ -83,7 +88,14 @@ exports.informeMensualPDF = async (req, res) => {
 // ======================================================
 exports.informeExcelTickets = async (req, res) => {
   try {
-    const empresaId = req.session.empresaActiva;
+    let empresaId;
+try {
+  const empresaId = req.empresaActiva;
+
+} catch {
+  return res.status(403).json({ msg: "No autorizado" });
+}
+
     if (!empresaId) {
       return res.status(400).json({ msg: "No hay empresa activa" });
     }
@@ -143,7 +155,14 @@ exports.informeExcelTickets = async (req, res) => {
 // ======================================================
 exports.productividadAgentes = async (req, res) => {
   try {
-    const empresaId = req.session.empresaActiva;
+    let empresaId;
+try {
+  const empresaId = req.empresaActiva;
+
+} catch {
+  return res.status(403).json({ msg: "No autorizado" });
+}
+
     if (!empresaId) {
       return res.status(400).json({ msg: "No hay empresa activa" });
     }
@@ -175,7 +194,14 @@ exports.productividadAgentes = async (req, res) => {
 // ======================================================
 exports.informeSLA = async (req, res) => {
   try {
-    const empresaId = req.session.empresaActiva;
+    let empresaId;
+try {
+  const empresaId = req.empresaActiva;
+
+} catch {
+  return res.status(403).json({ msg: "No autorizado" });
+}
+
     if (!empresaId) {
       return res.status(400).json({ msg: "No hay empresa activa" });
     }
@@ -205,7 +231,14 @@ exports.informeSLA = async (req, res) => {
 // ======================================================
 exports.informeBI = async (req, res) => {
   try {
-    const empresaId = req.session.empresaActiva;
+    let empresaId;
+try {
+  const empresaId = req.empresaActiva;
+
+} catch {
+  return res.status(403).json({ msg: "No autorizado" });
+}
+
     if (!empresaId) {
       return res.status(400).json({ msg: "No hay empresa activa" });
     }

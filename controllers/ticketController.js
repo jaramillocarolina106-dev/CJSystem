@@ -10,29 +10,42 @@
   calcularFechaLimite
 } = require("../services/slaService");
 
+const { getDashboardMetrics } = require("../services/dashboardMetrics");
+const ConfigEmpresa = require("../models/ConfigEmpresa");
 
 
 
-  // ============================================================
-  // 🧠 UTIL — EMPRESA ACTIVA
-  // ============================================================
+
+// ============================================================
+// 🧠 UTIL — EMPRESA ACTIVA (HEADER-BASED)
+// ============================================================
 const getEmpresaId = (req, res) => {
   let empresaId = req.user?.empresa;
+  const empresaHeader = req.headers["x-empresa-activa"];
 
-  // 🔥 SUPERADMIN CON EMPRESA ACTIVA
-  if (req.user?.rol === "superadmin" && req.cookies?.empresaActiva) {
-    empresaId = req.cookies.empresaActiva;
+  // 🔒 Seguridad
+  if (empresaHeader && empresaHeader !== "null" && req.user?.rol !== "superadmin") {
+    res.status(403).json({ msg: "No autorizado" });
+    return null;
   }
 
-  if (!empresaId) {
-    res.status(400).json({ msg: "Empresa no definida" });
+  // 👑 Superadmin selecciona empresa
+  if (
+    req.user?.rol === "superadmin" &&
+    empresaHeader &&
+    empresaHeader !== "null"
+  ) {
+    empresaId = empresaHeader;
+  }
+
+  // ❌ Empresa inválida
+  if (!empresaId || empresaId === "null") {
+    res.status(400).json({ msg: "No hay empresa activa" });
     return null;
   }
 
   return empresaId;
 };
-
-
 
   // ============================================================
   // 🧠 UTIL — GENERAR CÓDIGO ÚNICO
@@ -64,22 +77,6 @@ const getEmpresaId = (req, res) => {
 
       const { titulo, descripcion, prioridad, categoria } = req.body;
 
-      // ==========================
-// 👤 ASIGNACIÓN INICIAL (OPCIONAL)
-// ==========================
-if (
-  ["admin", "agente"].includes(req.user.rol) &&
-  req.body.agenteId
-) {
-  ticket.asignadoA = req.body.agenteId;
-  ticket.estado = "en_progreso";
-
-  agregarHistorial(
-    ticket,
-    "Ticket asignado",
-    `Asignado al crear por ${req.user.nombre}`
-  );
-}
 
       // ==========================
 // 👤 USUARIO AFECTADO
@@ -120,24 +117,17 @@ const adjuntos = (req.files || []).map(file => ({
 const ticket = await Ticket.create({
   empresa: empresaId,
 
-  // 👤 usuario afectado
-  usuario: usuarioFinal,
-
-  // 👤 quien lo creó
-  creadoPor: req.user.id,
+  creadoPor: usuarioFinal,
 
   codigo: generarCodigo(),
-
   titulo: titulo.trim(),
   descripcion: descripcion.trim(),
-
   urgenciaUsuario: prioridadSolicitada,
   prioridad: prioridadFinal,
-
   categoria: categoria || "General",
-
   adjuntos
 });
+
 
 
 // ==========================
@@ -179,32 +169,21 @@ await ticket.save();
   // ============================================================
   // 📋 LISTAR TICKETS
   // ============================================================
-  exports.listar = async (req, res) => {
-    try {
-      const empresaId = getEmpresaId(req, res);
-      if (!empresaId) return;
+ exports.listar = async (req, res) => {
+  try {
+    const tickets = await Ticket.find({
+      empresa: req.user.empresa   // 👈 ya viene normalizada
+    })
+    .populate("asignadoA")
+    .populate("creadoPor");
 
-      const filtros = { empresa: empresaId };
+    res.json(tickets);
+  } catch (err) {
+    console.error("❌ Error listar tickets:", err);
+    res.status(500).json({ msg: "Error listando tickets" });
+  }
+};
 
-      if (req.user.rol === "cliente") {
-        filtros.creadoPor = req.user.id;
-      }
-
-      if (req.query.estado) filtros.estado = req.query.estado;
-      if (req.query.prioridad) filtros.prioridad = req.query.prioridad;
-
-      const tickets = await Ticket.find(filtros)
-        .sort({ createdAt: -1 })
-        .populate("creadoPor", "nombre email")
-        .populate("asignadoA", "nombre email");
-
-      res.json(tickets);
-
-    } catch (err) {
-      console.error("❌ Error listar tickets:", err);
-      res.status(500).json({ msg: "Error listando tickets" });
-    }
-  };
 
   // ============================================================
   // 🔍 OBTENER TICKET (CORREGIDO)
@@ -313,38 +292,42 @@ exports.asignar = async (req, res) => {
     const empresaId = getEmpresaId(req, res);
     if (!empresaId) return;
 
-    const { agenteId } = req.body;
-
     const ticket = await Ticket.findById(req.params.id);
-    if (!ticket) return res.status(404).json({ msg: "Ticket no encontrado" });
+    if (!ticket) {
+      return res.status(404).json({ msg: "Ticket no encontrado" });
+    }
 
     if (String(ticket.empresa) !== String(empresaId)) {
       return res.status(403).json({ msg: "No autorizado" });
     }
 
-    
- // 🟦 AGENTE o ADMIN: se asigna a sí mismo
-if (["agente", "admin"].includes(req.user.rol)) {
-  if (ticket.asignadoA) {
-    return res.status(400).json({ msg: "El ticket ya está asignado" });
-  }
+    // 🟦 AGENTE → se asigna a sí mismo
+    if (req.user.rol === "agente") {
+      if (ticket.asignadoA) {
+        return res.status(400).json({ msg: "El ticket ya está asignado" });
+      }
 
-  ticket.asignadoA = req.user.id;
+      ticket.asignadoA = req.user.id;
+      ticket.estado = "en_progreso";
 
-  agregarHistorial(
-    ticket,
-    "Ticket tomado",
-    `Tomado por ${req.user.nombre} (${req.user.rol})`
-  );
-}
+      agregarHistorial(
+        ticket,
+        "Ticket tomado",
+        `Tomado por ${req.user.nombre}`
+      );
+    }
 
+    // 🟨 ADMIN / SUPERADMIN → asigna a otro agente
+    if (req.user.rol === "admin" || req.user.rol === "superadmin") {
+      const { agenteId } = req.body;
 
-    // 🟩 ADMIN / SUPERADMIN
-    if (["admin", "superadmin"].includes(req.user.rol)) {
       if (!agenteId) {
         return res.status(400).json({ msg: "Agente requerido" });
       }
+
       ticket.asignadoA = agenteId;
+      ticket.estado = "en_progreso";
+
       agregarHistorial(
         ticket,
         "Ticket asignado",
@@ -352,24 +335,26 @@ if (["agente", "admin"].includes(req.user.rol)) {
       );
     }
 
-    // ⏱️ INICIAR SLA SOLO AL TOMAR EL TICKET
-  if (!ticket.fechaLimite) {
-  const horasSLA = await obtenerHorasSLA(
-    empresaId,
-    ticket.prioridad
-  );
+    // 🟧 SLA (solo si queda asignado)
+    if (ticket.asignadoA && ticket.estado !== "cerrado") {
+      const horasSLA = await obtenerHorasSLA(
+        empresaId,
+        ticket.prioridad
+      );
 
-  const fechaLimite = await calcularFechaLimite(
-    empresaId,
-    horasSLA
-  );
+      const fechaLimite = await calcularFechaLimite(
+        empresaId,
+        horasSLA
+      );
 
-  ticket.horasSLA = horasSLA;
-  ticket.fechaLimite = fechaLimite;
-}
+      ticket.sla = {
+        horas: horasSLA,
+        fechaLimite,
+        alertaEnviada: false,
+        vencidoNotificado: false
+      };
+    }
 
-
-    ticket.estado = "en_progreso";
     await ticket.save();
 
     await audit({
@@ -390,82 +375,95 @@ if (["agente", "admin"].includes(req.user.rol)) {
   // ============================================================
   // 🔄 CAMBIAR ESTADO
   // ============================================================
-  exports.cambiarEstado = async (req, res) => {
-    try {
-      const empresaId = getEmpresaId(req, res);
-      if (!empresaId) return;
+exports.cambiarEstado = async (req, res) => {
+  try {
+    const empresaId = getEmpresaId(req, res);
+    if (!empresaId) return;
 
-      const { estado } = req.body;
-      if (!estado) {
-        return res.status(400).json({ msg: "Estado requerido" });
-      }
-
-      const ticket = await Ticket.findById(req.params.id);
-      if (!ticket) return res.status(404).json({ msg: "Ticket no encontrado" });
-
-      const anterior = ticket.estado;
-      ticket.estado = estado;
-
-      if (estado === "cerrado") {
-        ticket.fechaCierre = new Date();
-      }
-
-      agregarHistorial(ticket, "Cambio de estado", `${anterior} → ${estado}`);
-      await ticket.save();
-
-      await audit({
-        req,
-        accion: "Cambiar estado",
-        detalle: `Ticket ${ticket.codigo}`
-      });
-
-      res.json({ msg: "Estado actualizado", ticket });
-
-    } catch (err) {
-      console.error("❌ Error cambiar estado:", err);
-      res.status(500).json({ msg: "Error cambiando estado" });
+    const { estado } = req.body;
+    if (!estado) {
+      return res.status(400).json({ msg: "Estado requerido" });
     }
-  };
 
-  async function getDashboardMetrics(empresaId, inicio) {
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) return res.status(404).json({ msg: "Ticket no encontrado" });
 
-  const fin = new Date();
-  fin.setHours(23, 59, 59, 999);
+    // 🔥 ASEGURAR SLA AL ENTRAR EN PROGRESO
+    if (
+      estado === "en_progreso" &&
+      ticket.asignadoA &&
+      !ticket.sla?.fechaLimite
+    ) {
+      const horasSLA = await obtenerHorasSLA(
+        empresaId,
+        ticket.prioridad
+      );
 
-  const filtro = {
-    empresa: empresaId,
-    createdAt: { $gte: inicio, $lte: fin }
-  };
+      const fechaLimite = await calcularFechaLimite(
+        empresaId,
+        horasSLA
+      );
 
-  // 🔹 Conteos por estado
-  const estadoAgg = await Ticket.aggregate([
-    { $match: filtro },
-    { $group: { _id: "$estado", total: { $sum: 1 } } }
-  ]);
+      ticket.sla = {
+        horas: horasSLA,
+        fechaLimite: fechaLimite,
+        alertaEnviada: false,
+        vencidoNotificado: false
+      };
+    }
 
-  const estado = {
-    abierto: 0,
-    en_progreso: 0,
-    escalado: 0,
-    cerrado: 0
-  };
+    const anterior = ticket.estado;
+    ticket.estado = estado;
+    let severidadAuditoria = "media"; // valor por defecto
 
-  estadoAgg.forEach(e => estado[e._id] = e.total);
+if (estado === "cerrado") {
+  const fechaCierre = new Date();
+  ticket.fechaCierre = fechaCierre;
 
-  // 🔹 Conteos por prioridad
-  const prioridadAgg = await Ticket.aggregate([
-    { $match: filtro },
-    { $group: { _id: "$prioridad", total: { $sum: 1 } } }
-  ]);
+  if (ticket.sla && ticket.sla.fechaLimite) {
+    const limite = new Date(ticket.sla.fechaLimite);
 
-  const prioridad = { alta: 0, media: 0, baja: 0 };
-  prioridadAgg.forEach(p => prioridad[p._id] = p.total);
+    if (fechaCierre <= limite) {
+      ticket.sla.cumplido = true;
+      ticket.sla.incumplido = false;
+    } else {
+      ticket.sla.cumplido = false;
+      ticket.sla.incumplido = true;
+    }
+  }
 
-  // 🔹 Total
-  const total = Object.values(estado).reduce((a, b) => a + b, 0);
-
-  return { estado, prioridad, total };
+  // 🧨 Severidad final del caso
+  if (ticket.sla?.incumplido) {
+    severidadAuditoria = "alta";
+  } else {
+    severidadAuditoria = "media";
+  }
 }
+
+
+
+    agregarHistorial(ticket, "Cambio de estado", `${anterior} → ${estado}`);
+    await ticket.save();
+
+    await audit({
+  req,
+  accion: estado === "cerrado" ? "Cerrar ticket" : "Cambiar estado",
+  detalle:
+    estado === "cerrado"
+      ? `Ticket ${ticket.codigo} ${ticket.sla?.incumplido ? "FUERA SLA" : "EN SLA"}`
+      : `Ticket ${ticket.codigo}: ${anterior} → ${estado}`,
+  severidad: severidadAuditoria
+});
+
+    res.json({ msg: "Estado actualizado", ticket });
+
+  } catch (err) {
+    console.error("❌ Error cambiar estado:", err);
+    res.status(500).json({ msg: "Error cambiando estado" });
+  }
+};
+
+
 
 // ============================================================
 // 🔴 ESCALAR TICKET (ENTERPRISE)
@@ -542,7 +540,9 @@ exports.escalarTicket = async (req, res) => {
 // ============================================================
 exports.cambiarPrioridad = async (req, res) => {
   try {
-    const empresaId = req.user.empresa;
+    const empresaId = getEmpresaId(req, res);
+if (!empresaId) return;
+
     const { prioridad } = req.body;
 
     if (!["baja", "media", "alta"].includes(prioridad)) {
@@ -567,16 +567,18 @@ exports.cambiarPrioridad = async (req, res) => {
     // 🔄 Cambiar prioridad
     ticket.prioridad = prioridad;
 
-    // ⏱️ Recalcular SLA si ya está en progreso
-    if (ticket.asignadoA) {
-      const horasSLA = await obtenerHorasSLA(empresaId, prioridad);
-      const fechaLimite = await calcularFechaLimite(empresaId, horasSLA);
+// ⏱️ Recalcular SLA si ya está en progreso
+if (ticket.asignadoA) {
+  const horasSLA = await obtenerHorasSLA(empresaId, prioridad);
+  const fechaLimite = await calcularFechaLimite(empresaId, horasSLA);
 
-      ticket.horasSLA = horasSLA;
-      ticket.fechaLimite = fechaLimite;
-      ticket.slaAlertaEnviada = false;
-      ticket.slaVencidoNotificado = false;
-    }
+  ticket.sla = {
+    horas: horasSLA,
+    fechaLimite: fechaLimite,
+    alertaEnviada: false,
+    vencidoNotificado: false
+  };
+} 
 
     // 📜 Historial
     agregarHistorial(
@@ -605,17 +607,20 @@ exports.cambiarPrioridad = async (req, res) => {
 // ============================================================
 exports.dashboardEmpresa = async (req, res) => {
   try {
-    const empresaId = req.user.empresa;
-    if (!empresaId) {
-      return res.status(400).json({ msg: "Empresa no definida" });
-    }
+    const empresaId = getEmpresaId(req, res);
+    if (!empresaId) return;
 
-    // 📅 rango: últimos 30 días
-    const inicio = new Date();
-    inicio.setDate(inicio.getDate() - 30);
-    inicio.setHours(0, 0, 0, 0);
+    const desde = new Date();
+    desde.setDate(desde.getDate() - 30);
+    desde.setHours(0, 0, 0, 0);
 
-    const metrics = await getDashboardMetrics(empresaId, inicio);
+    const hasta = new Date();
+
+    const metrics = await getDashboardMetrics(
+      empresaId,
+      { desde, hasta },
+      "mes"
+    );
 
     res.json(metrics);
 
@@ -626,5 +631,61 @@ exports.dashboardEmpresa = async (req, res) => {
 };
 
 
-exports.getDashboardMetrics = getDashboardMetrics;
+// ============================================================
+// 📊 SLA POR AGENTE (ENTERPRISE)
+// ============================================================
+exports.slaPorAgente = async (req, res) => {
+  try {
+    const empresaId = getEmpresaId(req, res);
+    if (!empresaId) return;
 
+    const tickets = await Ticket.find({
+      empresa: empresaId,
+      estado: "cerrado",
+      asignadoA: { $ne: null },
+      "sla.fechaLimite": { $exists: true }
+    }).populate("asignadoA", "nombre");
+
+    const map = {};
+
+    tickets.forEach(t => {
+      const agente = t.asignadoA;
+      if (!agente) return;
+
+      const id = agente._id.toString();
+
+      if (!map[id]) {
+        map[id] = {
+          nombre: agente.nombre,
+          total: 0,
+          enSla: 0,
+          vencidos: 0
+        };
+      }
+
+      map[id].total++;
+
+      if (t.sla?.incumplido) {
+        map[id].vencidos++;
+      } else {
+        map[id].enSla++;
+      }
+    });
+
+    const resultado = Object.values(map).map(a => ({
+      nombre: a.nombre,
+      total: a.total,
+      enSla: a.enSla,
+      vencidos: a.vencidos,
+      sla: a.total === 0
+        ? 100
+        : Math.round((a.enSla / a.total) * 100)
+    }));
+
+    res.json(resultado);
+
+  } catch (err) {
+    console.error("❌ Error SLA por agente:", err);
+    res.status(500).json({ msg: "Error calculando SLA por agente" });
+  }
+};

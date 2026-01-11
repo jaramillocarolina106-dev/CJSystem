@@ -8,18 +8,7 @@ const fs = require("fs");
 const Empresa = require("../models/Empresa");
 const User = require("../models/User");
 const Ticket = require("../models/Ticket");
-let getDashboardMetrics;
-
-async function loadMetrics() {
-  if (!getDashboardMetrics) {
-    const mod = await import("../services/dashboardMetrics.js");
-    getDashboardMetrics = mod.getDashboardMetrics;
-
-
-  }
-}
-
-
+const { getDashboardMetrics } = require("../services/dashboardMetrics");
 
 /* ============================================================
    🖼️ DESCARGAR IMAGEN (QuickChart → Buffer)
@@ -46,78 +35,81 @@ function generarGrafica(config) {
 }
 
 
+
 /* ============================================================
    📄 PDF POR EMPRESA (CON GRÁFICA)
 ============================================================ */
 exports.reporteEmpresaPDF = async (req, res) => {
-  let doc;
+let doc;
 
   try {
 
-        await loadMetrics();
+    const tipo = req.query.tipo || "mensual";
+    const empresaId = req.user?.empresa;
 
-    /* =========================
-       CONTEXTO DE EMPRESA
-    ========================= */
-    if (!req.user) {
-      return res.status(401).json({ msg: "No autenticado" });
-    }
 
-    let empresaId = req.user.empresa;
-
-// 🔥 SUPERADMIN IMPERSONANDO EMPRESA (CORRECTO)
-if (req.user.rol === "superadmin") {
-  if (!req.cookies.empresaActiva) {
-    return res.status(400).json({ msg: "Superadmin sin empresa activa" });
-  }
-
-  empresaId = new mongoose.Types.ObjectId(req.cookies.empresaActiva);
+if (!["mensual", "anual", "personalizado"].includes(tipo)) {
+  return res.status(400).json({ msg: "Tipo de reporte inválido" });
 }
 
+if (!empresaId) {
+  return res.status(400).json({ msg: "Empresa activa no definida" });
+}
 
-    if (!empresaId) {
-      return res.status(401).json({ msg: "No hay empresa activa" });
-    }
+const empresaObjectId = new mongoose.Types.ObjectId(empresaId);
 
-    const tipo = req.query.tipo || "mensual"; // mensual | anual
-    const { desde, hasta } = req.query;
+const empresa = await Empresa.findById(empresaObjectId);
+if (!empresa) {
+  return res.status(404).json({ msg: "Empresa no encontrada" });
+}
 
-
-    const empresa = await Empresa.findById(empresaId).lean();
-    if (!empresa) {
-      return res.status(404).json({ msg: "Empresa no encontrada" });
-    }
 
   /* =========================
    RANGO DE FECHAS
 ========================= */
-const hoy = new Date();
-
 let fechaDesde;
-let fechaHasta = new Date();
+let fechaHasta;
 
-if (req.query.desde && req.query.hasta) {
+if (tipo === "personalizado") {
+  if (!req.query.desde || !req.query.hasta) {
+    return res.status(400).json({ msg: "Fechas requeridas" });
+  }
+
   fechaDesde = new Date(req.query.desde);
   fechaDesde.setUTCHours(0, 0, 0, 0);
 
   fechaHasta = new Date(req.query.hasta);
   fechaHasta.setUTCHours(23, 59, 59, 999);
 }
- else if (tipo === "anual") {
-  // 📌 REPORTE ANUAL
-  fechaDesde = new Date(hoy.getFullYear(), 0, 1);
-} else {
-  // 📌 REPORTE MENSUAL
-  fechaDesde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+
+else if (tipo === "anual") {
+  const anio = Number(req.query.anio) || new Date().getFullYear();
+
+  fechaDesde = new Date(anio, 0, 1);
+  fechaHasta = new Date(anio, 11, 31, 23, 59, 59, 999);
+}
+
+else {
+  
+ const mes = Number(req.query.mes);
+const anio = Number(req.query.anio);
+
+if (Number.isNaN(mes) || Number.isNaN(anio)) {
+  return res.status(400).json({ msg: "Mes y año inválidos" });
 }
 
 
+  
+  fechaDesde = new Date(anio, mes - 1, 1);
+  fechaHasta = new Date(anio, mes, 0, 23, 59, 59, 999);
+}
 
     /* =========================
    FILTRO BASE DE FECHA
 ========================= */
 const filtroFecha = {
-  empresa: empresaId,
+  empresa: empresaObjectId
+,
   createdAt: { $gte: fechaDesde, $lte: fechaHasta }
 };
 
@@ -132,9 +124,10 @@ if (req.query.hoy === "1") {
 else if (req.query.semana === "1") {
   tipoFiltro = "semana";
 }
-else if (req.query.mes === "1") {
+else if (tipo === "mensual") {
   tipoFiltro = "mes";
 }
+
 else if (req.query.desde && req.query.hasta) {
   tipoFiltro = "rango";
 }
@@ -171,7 +164,8 @@ const totalTickets =
 const topCreadores = await Ticket.aggregate([
   {
     $match: {
-  empresa: empresaId,
+  empresa: empresaObjectId
+,
   creadoPor: { $ne: null },
   createdAt: { $gte: fechaDesde, $lte: fechaHasta }
 }
@@ -233,7 +227,8 @@ if (!rankingForzado || rankingForzado.length === 0) {
 const topAgentes = await Ticket.aggregate([
   {
     $match: {
-  empresa: empresaId,
+  empresa: empresaObjectId
+,
   asignadoA: { $ne: null },
   estado: "cerrado",
   createdAt: {
@@ -301,7 +296,8 @@ const matchFecha = {
 const fallasFrecuentes = await Ticket.aggregate([
   {
     $match: {
-      empresa: empresaId,
+      empresa: empresaObjectId
+,
       categoria: { $ne: null },
       ...matchFecha
     }
