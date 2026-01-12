@@ -346,13 +346,16 @@ exports.asignar = async (req, res) => {
         empresaId,
         horasSLA
       );
-
+if (ticket.estado !== "cerrado") {
       ticket.sla = {
-        horas: horasSLA,
-        fechaLimite,
-        alertaEnviada: false,
-        vencidoNotificado: false
-      };
+  ...ticket.sla,
+  horas: horasSLA,
+  fechaLimite,
+  alertaEnviada: false,
+  vencidoNotificado: false
+};
+}
+
     }
 
     await ticket.save();
@@ -404,12 +407,16 @@ exports.cambiarEstado = async (req, res) => {
         horasSLA
       );
 
-      ticket.sla = {
-        horas: horasSLA,
-        fechaLimite: fechaLimite,
-        alertaEnviada: false,
-        vencidoNotificado: false
-      };
+ if (ticket.estado !== "cerrado") {
+  ticket.sla = {
+    ...ticket.sla,
+    horas: horasSLA,
+    fechaLimite,
+    alertaEnviada: false,
+    vencidoNotificado: false
+  };
+}
+
     }
 
     const anterior = ticket.estado;
@@ -567,18 +574,19 @@ if (!empresaId) return;
     // 🔄 Cambiar prioridad
     ticket.prioridad = prioridad;
 
-// ⏱️ Recalcular SLA si ya está en progreso
-if (ticket.asignadoA) {
+if (ticket.asignadoA && ticket.estado !== "cerrado") {
   const horasSLA = await obtenerHorasSLA(empresaId, prioridad);
   const fechaLimite = await calcularFechaLimite(empresaId, horasSLA);
 
   ticket.sla = {
+    ...ticket.sla,
     horas: horasSLA,
-    fechaLimite: fechaLimite,
+    fechaLimite,
     alertaEnviada: false,
     vencidoNotificado: false
   };
-} 
+}
+
 
     // 📜 Historial
     agregarHistorial(
