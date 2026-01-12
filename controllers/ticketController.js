@@ -335,26 +335,28 @@ exports.asignar = async (req, res) => {
       );
     }
 
-    // 🟧 SLA (solo si queda asignado)
-    if (ticket.asignadoA && ticket.estado !== "cerrado") {
-      const horasSLA = await obtenerHorasSLA(
-        empresaId,
-        ticket.prioridad
-      );
+    
+  // 🟧 SLA 
+if (ticket.asignadoA && !ticket.fechaCierre) {
+  const horasSLA = await obtenerHorasSLA(
+    empresaId,
+    ticket.prioridad
+  );
 
-      const fechaLimite = await calcularFechaLimite(
-        empresaId,
-        horasSLA
-      );
-if (ticket.estado !== "cerrado") {
-      ticket.sla = {
-  ...ticket.sla,
-  horas: horasSLA,
-  fechaLimite,
-  alertaEnviada: false,
-  vencidoNotificado: false
-};
-}
+  const fechaLimite = await calcularFechaLimite(
+    empresaId,
+    horasSLA
+  );
+
+  ticket.sla = {
+    ...ticket.sla,
+    horas: horasSLA,
+    fechaLimite,
+    alertaEnviada: false,
+    vencidoNotificado: false
+  };
+
+
 
     }
 
@@ -407,7 +409,8 @@ exports.cambiarEstado = async (req, res) => {
         horasSLA
       );
 
- if (ticket.estado !== "cerrado") {
+ if (!ticket.fechaCierre && !ticket.sla?.final) {
+
   ticket.sla = {
     ...ticket.sla,
     horas: horasSLA,
@@ -439,13 +442,18 @@ if (estado === "cerrado") {
     }
   }
 
+  
+  ticket.sla.final = true;
+}
+
+
   // 🧨 Severidad final del caso
   if (ticket.sla?.incumplido) {
     severidadAuditoria = "alta";
   } else {
     severidadAuditoria = "media";
   }
-}
+
 
 
 
@@ -574,7 +582,7 @@ if (!empresaId) return;
     // 🔄 Cambiar prioridad
     ticket.prioridad = prioridad;
 
-if (ticket.asignadoA && ticket.estado !== "cerrado") {
+if (ticket.asignadoA && !ticket.fechaCierre) {
   const horasSLA = await obtenerHorasSLA(empresaId, prioridad);
   const fechaLimite = await calcularFechaLimite(empresaId, horasSLA);
 
@@ -586,6 +594,7 @@ if (ticket.asignadoA && ticket.estado !== "cerrado") {
     vencidoNotificado: false
   };
 }
+
 
 
     // 📜 Historial
