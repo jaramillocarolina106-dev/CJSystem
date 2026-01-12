@@ -36,11 +36,14 @@ module.exports = async ({ req, accion, detalle, severidad = "media" }) => {
     /* =========================
        🌐 IP REAL DEL CLIENTE
     ========================= */
-    const ip =
-      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req.socket?.remoteAddress ||
-      req.ip ||
-      "—";
+    const rawIp =
+  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+  req.ip ||
+  req.socket?.remoteAddress ||
+  "—";
+
+const ip = rawIp.replace("::ffff:", "");
+
 
     const userAgent =
       req.headers["user-agent"] || "—";
