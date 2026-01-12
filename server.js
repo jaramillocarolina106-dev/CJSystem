@@ -15,7 +15,7 @@ require("dotenv").config();
 // 🚀 APP (PRIMERO)
 // =========================
 const app = express();
-
+app.set("trust proxy", true);
 // =========================
 // 🛡️ SEGURIDAD
 // =========================
