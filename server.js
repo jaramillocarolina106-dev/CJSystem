@@ -9,13 +9,14 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const path = require("path");
+const notificacionesRoutes = require("./routes/notificaciones");
 require("dotenv").config();
 
 // =========================
 // 🚀 APP (PRIMERO)
 // =========================
 const app = express();
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 // =========================
 // 🛡️ SEGURIDAD
 // =========================
@@ -109,6 +110,8 @@ app.use("/api/usuarios", require("./routes/usuariosRoutes"));
 app.use("/api/config-empresa", require("./routes/configEmpresaRoutes"));
 app.use("/api/reportes", require("./routes/reportesRoutes"));
 app.use("/api/dashboard", require("./routes/dashboardRoutes"));
+app.use("/api/notificaciones", notificacionesRoutes);
+
 
 // =========================
 // 🧪 PING
