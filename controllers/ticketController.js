@@ -12,7 +12,7 @@
 
 const { getDashboardMetrics } = require("../services/dashboardMetrics");
 const ConfigEmpresa = require("../models/ConfigEmpresa");
-
+const { enviarPushUsuario } = require("../services/pushService");
 
 
 
@@ -264,6 +264,44 @@ await ticket.save();
       agregarHistorial(ticket, "Nuevo comentario", `Por ${req.user.nombre}`);
       await ticket.save();
 
+let usuariosANotificar = new Set();
+
+const autorId = req.user.id.toString();
+
+
+if (req.user.rol === "usuario") {
+  if (ticket.asignadoA) {
+    usuariosANotificar.add(ticket.asignadoA.toString());
+  }
+}
+
+
+if (req.user.rol === "agente") {
+  if (ticket.creadoPor) {
+    usuariosANotificar.add(ticket.creadoPor.toString());
+  }
+}
+
+
+if (["admin", "superadmin"].includes(req.user.rol)) {
+  if (ticket.asignadoA) {
+    usuariosANotificar.add(ticket.asignadoA.toString());
+  } else if (ticket.creadoPor) {
+    usuariosANotificar.add(ticket.creadoPor.toString());
+  }
+}
+
+
+usuariosANotificar.delete(autorId);
+
+
+for (const userId of usuariosANotificar) {
+  await enviarPushUsuario(userId, {
+    title: "💬 Nuevo comentario",
+    body: `Ticket ${ticket.codigo}: ${ticket.titulo}`,
+    url: `/ticket-detalle.html?id=${ticket._id}`
+  });
+}
       const ticketActualizado = await Ticket.findById(ticket._id)
         .populate({
           path: "comentarios.autor",
@@ -308,6 +346,7 @@ exports.asignar = async (req, res) => {
       }
 
       ticket.asignadoA = req.user.id;
+      agenteAsignadoId = req.user.id;
       ticket.estado = "en_progreso";
 
       agregarHistorial(
@@ -326,6 +365,7 @@ exports.asignar = async (req, res) => {
       }
 
       ticket.asignadoA = agenteId;
+      agenteAsignadoId = agenteId;
       ticket.estado = "en_progreso";
 
       agregarHistorial(
@@ -362,13 +402,22 @@ if (ticket.asignadoA && !ticket.fechaCierre) {
 
     await ticket.save();
 
-    await audit({
-      req,
-      accion: "Asignar ticket",
-      detalle: `Ticket ${ticket.codigo}`
-    });
+if (agenteAsignadoId) {
+  await enviarPushUsuario(agenteAsignadoId, {
+    title: "🎫 Nuevo ticket asignado",
+    body: `Ticket ${ticket.codigo}: ${ticket.titulo}`,
+    url: `/ticket-detalle-agente.html?id=${ticket._id}`
+  });
+}
 
-    res.json({ msg: "Ticket asignado correctamente", ticket });
+await audit({
+  req,
+  accion: "Asignar ticket",
+  detalle: `Ticket ${ticket.codigo}`
+});
+
+res.json({ msg: "Ticket asignado correctamente", ticket });
+
 
   } catch (err) {
     console.error("❌ Error asignar:", err);
