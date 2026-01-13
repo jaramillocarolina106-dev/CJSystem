@@ -46,7 +46,10 @@ const auditLogSchema = new mongoose.Schema(
       type: String,
       default: "—"
     },
-
+ipRaw: {
+  type: String,
+  default: "—"
+},
     userAgent: {
       type: String,
       default: "—"
@@ -69,5 +72,6 @@ const auditLogSchema = new mongoose.Schema(
 ========================= */
 auditLogSchema.index({ "empresa.id": 1, fecha: -1 });
 auditLogSchema.index({ "usuario.id": 1, fecha: -1 });
+auditLogSchema.index({ ip: 1, fecha: -1 });
 
 module.exports = mongoose.model("AuditLog", auditLogSchema);
