@@ -1,5 +1,6 @@
 // routes/authRoutes.js
 const express = require("express");
+const AuditLog = require("../models/AuditLog");
 const router = express.Router();
 
 const {
@@ -45,14 +46,6 @@ router.post(
 // PERFIL
 router.get("/perfil", verifyToken, perfil);
 
-// LISTAR USUARIOS
-router.get(
-  "/usuarios",
-  verifyToken,
-  permitRoles("admin", "superadmin"),
-  listarUsuarios
-);
-// ACTIVAR / DESACTIVAR USUARIO
 router.put(
   "/usuarios/:id",
   verifyToken,
@@ -68,8 +61,8 @@ router.put(
         return res.status(404).json({ msg: "Usuario no encontrado" });
       }
 
-      // 🔒 NO AUTO-DESACTIVARSE (FIX REAL)
-     if (req.user.id.toString() === usuario._id.toString()) {
+      // 🔒 NO AUTO-DESACTIVARSE
+      if (req.user.id.toString() === usuario._id.toString()) {
         return res
           .status(403)
           .json({ msg: "No puedes desactivarte a ti mismo" });
@@ -82,9 +75,29 @@ router.put(
           .json({ msg: "No se puede desactivar el superadmin" });
       }
 
+      // ✅ CAMBIO DE ESTADO
       usuario.activo = activo;
       await usuario.save();
 
+      // 🧾 AUDITORÍA
+      await AuditLog.create({
+        accion: activo ? "USUARIO_ACTIVADO" : "USUARIO_DESACTIVADO",
+        detalle: `Usuario ${usuario.email}`,
+        severidad: "alta",
+        usuario: {
+          id: req.user.id,
+          nombre: req.user.nombre,
+          rol: req.user.rol
+        },
+        empresa: {
+          id: req.user.empresa,
+          nombre: "-"
+        },
+        ip: req.ip,
+        userAgent: req.headers["user-agent"]
+      });
+
+      // ✅ RESPUESTA FINAL (SOLO UNA)
       res.json({ msg: "Estado del usuario actualizado" });
 
     } catch (err) {
