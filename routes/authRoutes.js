@@ -49,7 +49,7 @@ router.get("/perfil", verifyToken, perfil);
 router.get(
   "/usuarios",
   verifyToken,
-  permitRoles("admin", "superadmin"),
+  permitRoles("admin", "agente", "superadmin"),
   listarUsuarios
 );
 
