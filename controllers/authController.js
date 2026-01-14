@@ -275,7 +275,9 @@
   // ==========================================================
   exports.listarUsuarios = async (req, res) => {
     try {
-      const empresaId = req.user.empresa;
+      const empresaId =
+  req.headers["x-empresa-activa"] || req.user.empresa;
+
 
       if (!empresaId) {
         return res.status(400).json({ msg: "Empresa no definida" });
