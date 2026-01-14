@@ -3,16 +3,39 @@ const router = express.Router();
 
 const verifyToken = require("../middlewares/verifyToken");
 const permitRoles = require("../middlewares/permitRoles");
-const requireEmpresaActiva = require("../middlewares/requireEmpresaActiva");
-const { dashboardEmpresa } = require("../controllers/dashboardController");
 
-// DASHBOARD UNIVERSAL
+const {
+  dashboardEmpresa,
+  dashboardAgente
+} = require("../controllers/dashboardController");
+
+// ===============================
+// DASHBOARD EMPRESA (ADMIN / SUPERADMIN)
+// ===============================
 router.get(
   "/",
   verifyToken,
-permitRoles("admin", "agente", "superadmin"),
-dashboardEmpresa
+  permitRoles("admin", "superadmin"),
+  dashboardEmpresa
 );
 
+// ===============================
+// DASHBOARD AGENTE
+// ===============================
+router.get(
+  "/agente",
+  verifyToken,
+  permitRoles("agente"),
+  dashboardAgente
+);
+// ===============================
+// DASHBOARD USUARIO
+// ===============================
+router.get(
+  "/usuario",
+  verifyToken,
+  permitRoles("usuario"),
+  dashboardUsuario
+);
 
 module.exports = router;
