@@ -23,13 +23,7 @@ const getEmpresaId = (req, res) => {
   let empresaId = req.user?.empresa;
   const empresaHeader = req.headers["x-empresa-activa"];
 
-  // 🔒 Seguridad
-  if (empresaHeader && empresaHeader !== "null" && req.user?.rol !== "superadmin") {
-    res.status(403).json({ msg: "No autorizado" });
-    return null;
-  }
-
-  // 👑 Superadmin selecciona empresa
+  // 👑 Superadmin puede cambiar empresa
   if (
     req.user?.rol === "superadmin" &&
     empresaHeader &&
