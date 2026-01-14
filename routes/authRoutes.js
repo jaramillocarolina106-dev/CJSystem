@@ -46,6 +46,13 @@ router.post(
 // PERFIL
 router.get("/perfil", verifyToken, perfil);
 
+router.get(
+  "/usuarios",
+  verifyToken,
+  permitRoles("admin", "superadmin"),
+  listarUsuarios
+);
+
 router.put(
   "/usuarios/:id",
   verifyToken,
