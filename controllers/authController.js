@@ -270,37 +270,28 @@
     }
   };
 
+  // ==========================================================
+  // 📌 LISTAR USUARIOS
+  // ==========================================================
+  exports.listarUsuarios = async (req, res) => {
+    try {
+      const empresaId = req.user.empresa;
 
-exports.listarUsuarios = async (req, res) => {
-  try {
-    // 🔒 ROLES PERMITIDOS
-    if (!["admin", "agente", "superadmin"].includes(req.user.rol)) {
-      return res.status(403).json({
-        msg: "No tienes permiso para realizar esta acción"
-      });
+      if (!empresaId) {
+        return res.status(400).json({ msg: "Empresa no definida" });
+      }
+
+      const usuarios = await User.find({ empresa: empresaId })
+        .select("-password")
+        .sort({ createdAt: -1 });
+
+      res.json(usuarios);
+
+    } catch (err) {
+      console.error("❌ Error listando usuarios:", err);
+      res.status(500).json({ msg: "Error listando usuarios" });
     }
-
-    const empresaId =
-      req.headers["x-empresa-activa"] || req.user.empresa;
-
-    if (!empresaId) {
-      return res.status(400).json({ msg: "Empresa no definida" });
-    }
-
-    const usuarios = await User.find({
-      empresa: empresaId,
-      rol: "usuario" // 👈 SOLO usuarios finales
-    })
-      .select("-password")
-      .sort({ createdAt: 1 });
-
-    res.json(usuarios);
-
-  } catch (err) {
-    console.error("❌ Error listando usuarios:", err);
-    res.status(500).json({ msg: "Error listando usuarios" });
-  }
-};
+  };
 
 // ==========================================================
 // 🔄 ACTIVAR / DESACTIVAR USUARIO
