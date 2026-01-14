@@ -60,104 +60,149 @@ const getEmpresaId = (req, res) => {
   };
 
 
+// ============================================================
+// 🟢 CREAR TICKET 
+// ============================================================
+exports.crear = async (req, res) => {
+  try {
+    const empresaId = getEmpresaId(req, res);
+    if (!empresaId) return;
 
-  // ============================================================
-  // 🟢 CREAR TICKET
-  // ============================================================
-  exports.crear = async (req, res) => {
-    try {
-      const empresaId = getEmpresaId(req, res);
-      if (!empresaId) return;
+    const {
+      titulo,
+      descripcion,
+      prioridad,
+      categoria,
+      agenteId
+    } = req.body;
 
-      const { titulo, descripcion, prioridad, categoria } = req.body;
+    // ==========================
+    // 👤 USUARIO AFECTADO
+    // ==========================
+    let usuarioFinal = req.user.id;
 
-
-      // ==========================
-// 👤 USUARIO AFECTADO
-// ==========================
-let usuarioFinal = req.user.id;
-
-// Admin o agente pueden crear para otro usuario
-if (
-  ["admin", "agente"].includes(req.user.rol) &&
-  req.body.usuarioId
-) {
-  usuarioFinal = req.body.usuarioId;
-}
-
-
-// 🔔 Prioridad solicitada por el usuario
-const prioridadSolicitada = ["baja", "media", "alta"].includes(prioridad)
-  ? prioridad
-  : "media";
-
-// 🎯 Prioridad inicial del ticket
-const prioridadFinal = prioridadSolicitada;
-
-
-
-
-// ==========================
-// 📎 ADJUNTOS
-// ==========================
-const adjuntos = (req.files || []).map(file => ({
-  nombre: file.originalname,
-  url: "/uploads/" + file.filename
-}));
-
-// ==========================
-// 🎫 CREAR TICKET
-// ==========================
-const ticket = await Ticket.create({
-  empresa: empresaId,
-
-  creadoPor: usuarioFinal,
-
-  codigo: generarCodigo(),
-  titulo: titulo.trim(),
-  descripcion: descripcion.trim(),
-  urgenciaUsuario: prioridadSolicitada,
-  prioridad: prioridadFinal,
-  categoria: categoria || "General",
-  adjuntos
-});
-
-
-
-// ==========================
-// 📜 HISTORIAL
-// ==========================
-agregarHistorial(
-  ticket,
-  "Ticket creado",
-  `Creado por ${req.user.nombre} (${req.user.rol})`
-);
-
-
-// 🔥 HISTORIAL DE AJUSTE DE PRIORIDAD (PRO)
-if (prioridadSolicitada !== prioridadFinal) {
-  agregarHistorial(
-    ticket,
-    "Ajuste de prioridad",
-    `Urgencia solicitada: ${prioridadSolicitada} → Prioridad asignada: ${prioridadFinal}`
-  );
-}
-
-await ticket.save();
-
-      await audit({
-        req,
-        accion: "Crear ticket",
-        detalle: `Ticket ${ticket.codigo}`
-      });
-
-      res.status(201).json({ msg: "Ticket creado exitosamente", ticket });
-
-    } catch (err) {
-      console.error("❌ Error crear ticket:", err);
-      res.status(500).json({ msg: "Error creando ticket" });
+    // Admin o agente pueden crear para otro usuario
+    if (
+      ["admin", "agente"].includes(req.user.rol) &&
+      req.body.usuarioId
+    ) {
+      usuarioFinal = req.body.usuarioId;
     }
-  };
+
+    // ==========================
+    // 🔔 PRIORIDAD
+    // ==========================
+    const prioridadSolicitada = ["baja", "media", "alta"].includes(prioridad)
+      ? prioridad
+      : "media";
+
+    const prioridadFinal = prioridadSolicitada;
+
+    // ==========================
+    // 👤 ASIGNACIÓN INICIAL
+    // ==========================
+    let asignadoInicial = null;
+    let estadoInicial = "abierto";
+
+    // Admin / superadmin pueden asignar agente al crear
+    if (
+      agenteId &&
+      ["admin", "superadmin"].includes(req.user.rol)
+    ) {
+      asignadoInicial = agenteId;
+      estadoInicial = "en_progreso";
+    }
+
+    // ==========================
+    // 📎 ADJUNTOS
+    // ==========================
+    const adjuntos = (req.files || []).map(file => ({
+      nombre: file.originalname,
+      url: "/uploads/" + file.filename
+    }));
+
+    // ==========================
+    // 🎫 CREAR TICKET
+    // ==========================
+    const ticket = await Ticket.create({
+      empresa: empresaId,
+      creadoPor: usuarioFinal,
+      asignadoA: asignadoInicial,
+      estado: estadoInicial,
+
+      codigo: generarCodigo(),
+      titulo: titulo.trim(),
+      descripcion: descripcion.trim(),
+      urgenciaUsuario: prioridadSolicitada,
+      prioridad: prioridadFinal,
+      categoria: categoria || "General",
+      adjuntos
+    });
+
+    // ==========================
+    // 📜 HISTORIAL
+    // ==========================
+    agregarHistorial(
+      ticket,
+      "Ticket creado",
+      `Creado por ${req.user.nombre} (${req.user.rol})`
+    );
+
+    if (asignadoInicial) {
+      agregarHistorial(
+        ticket,
+        "Ticket asignado",
+        "Asignado al crear el ticket"
+      );
+
+      // 🟧 SLA inicia al asignar
+      const horasSLA = await obtenerHorasSLA(
+        empresaId,
+        prioridadFinal
+      );
+
+      const fechaLimite = await calcularFechaLimite(
+        empresaId,
+        horasSLA
+      );
+
+      ticket.sla = {
+        horas: horasSLA,
+        fechaLimite,
+        alertaEnviada: false,
+        vencidoNotificado: false
+      };
+    }
+
+    await ticket.save();
+
+    // ==========================
+    // 🔔 NOTIFICACIÓN AGENTE
+    // ==========================
+    if (asignadoInicial) {
+      await enviarPushUsuario(asignadoInicial, {
+        title: "🎫 Nuevo ticket asignado",
+        body: `Ticket ${ticket.codigo}: ${ticket.titulo}`,
+        url: `/ticket-detalle-agente.html?id=${ticket._id}`
+      });
+    }
+
+    await audit({
+      req,
+      accion: "Crear ticket",
+      detalle: `Ticket ${ticket.codigo}`
+    });
+
+    res.status(201).json({
+      msg: "Ticket creado exitosamente",
+      ticket
+    });
+
+  } catch (err) {
+    console.error("❌ Error crear ticket:", err);
+    res.status(500).json({ msg: "Error creando ticket" });
+  }
+};
 
 
   // ============================================================
