@@ -52,8 +52,6 @@ router.get(
   permitRoles("admin", "superadmin"),
   listarUsuarios
 );
-
-
 // ACTIVAR / DESACTIVAR USUARIO
 router.put(
   "/usuarios/:id",
@@ -71,7 +69,7 @@ router.put(
       }
 
       // 🔒 NO AUTO-DESACTIVARSE (FIX REAL)
-      if (req.user._id.toString() === usuario._id.toString()) {
+     if (req.user.id.toString() === usuario._id.toString()) {
         return res
           .status(403)
           .json({ msg: "No puedes desactivarte a ti mismo" });
