@@ -6,8 +6,10 @@ const permitRoles = require("../middlewares/permitRoles");
 
 const {
   dashboardEmpresa,
-  dashboardAgente
+  dashboardAgente,
+  dashboardUsuario
 } = require("../controllers/dashboardController");
+
 
 // ===============================
 // DASHBOARD EMPRESA (ADMIN / SUPERADMIN)
