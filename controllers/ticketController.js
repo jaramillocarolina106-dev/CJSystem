@@ -216,6 +216,29 @@ await ticket.save();
     ticket.ultimaRespuestaPor = null;
     await ticket.save();
   }
+// ============================================================
+// 🔄 NORMALIZAR SLA PARA TICKETS ANTIGUOS
+// ============================================================
+if (
+  ticket.estado === "cerrado" &&
+  ticket.fechaCierre &&
+  ticket.sla?.fechaLimite &&
+  !ticket.sla?.final
+) {
+  const cierre = new Date(ticket.fechaCierre);
+  const limite = new Date(ticket.sla.fechaLimite);
+
+  if (cierre <= limite) {
+    ticket.sla.cumplido = true;
+    ticket.sla.incumplido = false;
+  } else {
+    ticket.sla.cumplido = false;
+    ticket.sla.incumplido = true;
+  }
+
+  ticket.sla.final = true;
+  await ticket.save();
+}
 
       res.json(ticket);
 
