@@ -34,7 +34,12 @@ module.exports = function getRealClientIP(req) {
     }
   }
 
-  // Fallback
   const fallback = normalize(req.ip);
-  return fallback || "—";
+
+if (!fallback || isPrivateIPv4(fallback) || fallback === "::1") {
+  return null;
+}
+
+return fallback;
+
 };

@@ -93,11 +93,14 @@ const ipRaw =
   usuario: usuarioData,
   empresa: empresaData,
 
-  ip,
-  ipRaw,
+  ipPublica: ip || "—",
+  ipRaw: ipRaw || "—",
+
+  geo: geo || null,
 
   userAgent
 });
+
 
 
   } catch (err) {
