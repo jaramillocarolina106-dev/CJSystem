@@ -1,6 +1,7 @@
 // utils/audit.js
 const AuditLog = require("../models/AuditLog");
 const Empresa = require("../models/Empresa");
+const getRealClientIP = require("./getRealClientIP");
 
 /**
  * 📌 Registro de auditoría centralizado
@@ -33,21 +34,18 @@ module.exports = async ({ req, accion, detalle, severidad = "media" }) => {
     const severidadFinal =
       severidadPorAccion[accionFinal] || severidad;
 
-  /* =========================
-   🌐 IP REAL DEL CLIENTE
-========================= */
-const rawIp =
-  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-  req.socket?.remoteAddress ||
-  req.ip ||
-  "—";
 
-// Normalizar SOLO IPv4 mapeada (::ffff:)
-let ip = rawIp;
+let ip = getRealClientIP(req);
+
+
 if (typeof ip === "string" && ip.startsWith("::ffff:")) {
   ip = ip.replace("::ffff:", "");
 }
 
+const ipRaw =
+  req.headers["x-forwarded-for"] ||
+  req.socket?.remoteAddress ||
+  "—";
 
 
     const userAgent =
