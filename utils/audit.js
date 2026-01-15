@@ -30,14 +30,15 @@ module.exports = async ({ req, accion, detalle, severidad = "media" }) => {
     ========================= */
     let ip = getRealClientIP(req);
 
-    if (typeof ip === "string" && ip.startsWith("::ffff:")) {
-      ip = ip.replace("::ffff:", "");
-    }
+if (typeof ip === "string" && ip.startsWith("::ffff:")) {
+  ip = ip.replace("::ffff:", "");
+}
 
-    const ipRaw =
-      req.headers["x-forwarded-for"] ||
-      req.socket?.remoteAddress ||
-      "—";
+const ipRaw =
+  req.headers["x-forwarded-for"] ||
+  req.socket?.remoteAddress ||
+  "—";
+
 
     /* =========================
        🌍 GEOLOCALIZACIÓN
@@ -85,19 +86,19 @@ module.exports = async ({ req, accion, detalle, severidad = "media" }) => {
     /* =========================
        🧾 GUARDAR AUDITORÍA
     ========================= */
-    await AuditLog.create({
-      accion: accionFinal,
-      detalle,
-      severidad: severidadFinal,
-      usuario: usuarioData,
-      empresa: empresaData,
+ await AuditLog.create({
+  accion: accionFinal,
+  detalle,
+  severidad: severidadFinal,
+  usuario: usuarioData,
+  empresa: empresaData,
 
-      ipPublica: ip,  
-      ipRaw,           
-      geo,             
+  ip,
+  ipRaw,
 
-      userAgent
-    });
+  userAgent
+});
+
 
   } catch (err) {
     console.error("❌ Error audit log:", err.message);
