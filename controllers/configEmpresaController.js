@@ -6,20 +6,16 @@ const ConfigEmpresa = require("../models/ConfigEmpresa");
 
 
 const getEmpresaId = (req, res) => {
-  let empresaId = req.user?.empresa;
   const empresaHeader = req.headers["x-empresa-activa"];
+  let empresaId = null;
 
-  if (empresaHeader && empresaHeader !== "null" && req.user?.rol !== "superadmin") {
-    res.status(403).json({ msg: "No autorizado" });
-    return null;
-  }
-
-  if (
-    req.user?.rol === "superadmin" &&
-    empresaHeader &&
-    empresaHeader !== "null"
-  ) {
-    empresaId = empresaHeader;
+ 
+  if (["admin", "superadmin"].includes(req.user?.rol)) {
+    empresaId = empresaHeader || null;
+  } 
+  
+  else {
+    empresaId = req.user?.empresa || null;
   }
 
   if (!empresaId || empresaId === "null") {
@@ -29,6 +25,7 @@ const getEmpresaId = (req, res) => {
 
   return empresaId;
 };
+
 
 
 // =======================================================
