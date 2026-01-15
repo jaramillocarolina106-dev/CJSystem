@@ -35,6 +35,10 @@ if (empresaId) {
       filtros.accion = { $regex: req.query.accion, $options: "i" };
     }
 
+if (req.query.severidad && req.query.severidad !== "todas") {
+  filtros.severidad = req.query.severidad;
+}
+
     const logs = await AuditLog.find(filtros)
       .populate("usuario", "nombre email")
       .sort({ fecha: -1 })
@@ -75,6 +79,9 @@ exports.exportarExcel = async (req, res) => {
     if (req.query.accion) {
       filtros.accion = { $regex: req.query.accion, $options: "i" };
     }
+if (req.query.severidad && req.query.severidad !== "todas") {
+  filtros.severidad = req.query.severidad;
+}
 
     const logs = await AuditLog.find(filtros)
       .sort({ fecha: -1 });
@@ -165,6 +172,9 @@ if (empresaId) {
     if (req.query.accion) {
       filtros.accion = { $regex: req.query.accion, $options: "i" };
     }
+if (req.query.severidad && req.query.severidad !== "todas") {
+  filtros.severidad = req.query.severidad;
+}
 
     const logs = await AuditLog.find(filtros)
       .populate("usuario", "nombre email")
