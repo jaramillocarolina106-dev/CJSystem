@@ -86,25 +86,31 @@ exports.exportarExcel = async (req, res) => {
     const ws = wb.addWorksheet("Auditoría");
 
     ws.columns = [
-      { header: "Fecha", key: "fecha", width: 22 },
-      { header: "Usuario", key: "usuario", width: 28 },
-      { header: "Empresa", key: "empresa", width: 28 },
-      { header: "Acción", key: "accion", width: 28 },
-      { header: "Detalle", key: "detalle", width: 40 },
-      { header: "Severidad", key: "severidad", width: 16 },
-      { header: "IP", key: "ip", width: 20 }
-    ];
+  { header: "Fecha", key: "fecha", width: 22 },
+  { header: "Usuario", key: "usuario", width: 28 },
+  { header: "Empresa", key: "empresa", width: 28 },
+  { header: "Acción", key: "accion", width: 28 },
+  { header: "Detalle", key: "detalle", width: 40 },
+  { header: "Severidad", key: "severidad", width: 16 },
+  { header: "IP pública", key: "ipPublica", width: 20 },
+  { header: "Ciudad", key: "ciudad", width: 20 },
+  { header: "País", key: "pais", width: 10 }
+];
+
 
     logs.forEach(l => {
       ws.addRow({
-        fecha: new Date(l.fecha).toLocaleString(),
-        usuario: l.usuario?.nombre || "Sistema",
-        empresa: l.empresa?.nombre || "Global",
-        accion: l.accion,
-        detalle: l.detalle || "",
-        severidad: l.severidad,
-        ip: l.ip === "::1" ? "Localhost" : l.ip
-      });
+  fecha: new Date(l.fecha).toLocaleString(),
+  usuario: l.usuario?.nombre || "Sistema",
+  empresa: l.empresa?.nombre || "Global",
+  accion: l.accion,
+  detalle: l.detalle || "",
+  severidad: l.severidad,
+  ipPublica: l.ipPublica || "—",
+  ciudad: l.geo?.ciudad || "—",
+  pais: l.geo?.pais || "—"
+});
+
     });
 
     const buffer = await wb.xlsx.writeBuffer();
@@ -302,18 +308,20 @@ if (empresaId) {
 
       textY += 18;
 
-      // IP
-      doc.fontSize(9).fillColor(gris)
-        .text(
-          `IP: ${
-            l.ip === "::1"
-              ? "Localhost"
-              : (l.ip || "-").replace("::ffff:", "")
-          }`,
-          60,
-          textY,
-          { width: 300 }
-        );
+     // IP + Ubicación
+const ipTexto = l.ipPublica || "—";
+const ciudadTexto = l.geo?.ciudad
+  ? `${l.geo.ciudad}, ${l.geo.pais || ""}`
+  : "Ubicación no disponible";
+
+doc.fontSize(9)
+  .fillColor(gris)
+  .text(
+    `IP: ${ipTexto} | ${ciudadTexto}`,
+    60,
+    textY,
+    { width: 360 }
+  );
 
       // Severidad (SIN continued)
       doc.font("Helvetica-Bold")
