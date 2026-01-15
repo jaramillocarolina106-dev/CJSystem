@@ -2,17 +2,8 @@
 const AuditLog = require("../models/AuditLog");
 const Empresa = require("../models/Empresa");
 const getRealClientIP = require("./getRealClientIP");
+const getGeoFromIP = require("./geo");
 
-/**
- * 📌 Registro de auditoría centralizado
- * Uso:
- * await audit({
- *   req,
- *   accion: "RESET_PASSWORD_ADMIN",
- *   detalle: "Admin restableció contraseña",
- *   severidad: "alta" // opcional
- * });
- */
 module.exports = async ({ req, accion, detalle, severidad = "media" }) => {
   try {
     /* =========================
@@ -34,22 +25,29 @@ module.exports = async ({ req, accion, detalle, severidad = "media" }) => {
     const severidadFinal =
       severidadPorAccion[accionFinal] || severidad;
 
+    /* =========================
+       🌐 IP REAL DEL CLIENTE
+    ========================= */
+    let ip = getRealClientIP(req);
 
-let ip = getRealClientIP(req);
+    if (typeof ip === "string" && ip.startsWith("::ffff:")) {
+      ip = ip.replace("::ffff:", "");
+    }
 
+    const ipRaw =
+      req.headers["x-forwarded-for"] ||
+      req.socket?.remoteAddress ||
+      "—";
 
-if (typeof ip === "string" && ip.startsWith("::ffff:")) {
-  ip = ip.replace("::ffff:", "");
-}
+    /* =========================
+       🌍 GEOLOCALIZACIÓN
+    ========================= */
+    const geo = getGeoFromIP(ip);
 
-const ipRaw =
-  req.headers["x-forwarded-for"] ||
-  req.socket?.remoteAddress ||
-  "—";
-
-
-    const userAgent =
-      req.headers["user-agent"] || "—";
+    /* =========================
+       🧠 USER AGENT
+    ========================= */
+    const userAgent = req.headers["user-agent"] || "—";
 
     /* =========================
        👤 SNAPSHOT DE USUARIO
@@ -59,55 +57,49 @@ const ipRaw =
           id: req.user.id,
           nombre: req.user.nombre,
           email: req.user.email,
-          rol:
-            req.user.rol === "cliente"
-              ? "usuario"
-              : req.user.rol
+          rol: req.user.rol === "cliente" ? "usuario" : req.user.rol
         }
       : null;
 
-/* =========================
-   🏢 SNAPSHOT DE EMPRESA (MULTI-EMPRESA REAL)
-========================= */
-let empresaId =
-  req.headers["x-empresa-activa"] &&
-  req.headers["x-empresa-activa"] !== "null"
-    ? req.headers["x-empresa-activa"]
-    : req.user?.empresa || null;
+    /* =========================
+       🏢 SNAPSHOT DE EMPRESA
+    ========================= */
+    let empresaId =
+      req.headers["x-empresa-activa"] &&
+      req.headers["x-empresa-activa"] !== "null"
+        ? req.headers["x-empresa-activa"]
+        : req.user?.empresa || null;
 
-let empresaData = null;
+    let empresaData = null;
 
-if (empresaId) {
-  const empresa = await Empresa.findById(empresaId).lean();
-  if (empresa) {
-    empresaData = {
-      id: empresa._id,
-      nombre: empresa.nombre
-    };
-  }
-}
-
+    if (empresaId) {
+      const empresa = await Empresa.findById(empresaId).lean();
+      if (empresa) {
+        empresaData = {
+          id: empresa._id,
+          nombre: empresa.nombre
+        };
+      }
+    }
 
     /* =========================
        🧾 GUARDAR AUDITORÍA
     ========================= */
-await AuditLog.create({
-  accion: accionFinal,
-  detalle,
-  severidad: severidadFinal,
-  usuario: usuarioData,
-  empresa: empresaData,
+    await AuditLog.create({
+      accion: accionFinal,
+      detalle,
+      severidad: severidadFinal,
+      usuario: usuarioData,
+      empresa: empresaData,
 
-  ip,        
-  ipRaw: rawIp, 
+      ipPublica: ip,  
+      ipRaw,           
+      geo,             
 
-  userAgent
-});
-
-
+      userAgent
+    });
 
   } catch (err) {
-    // ❗ La auditoría NUNCA debe romper el flujo principal
     console.error("❌ Error audit log:", err.message);
   }
 };
