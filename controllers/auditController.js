@@ -35,10 +35,6 @@ if (empresaId) {
       filtros.accion = { $regex: req.query.accion, $options: "i" };
     }
 
-if (req.query.severidad && req.query.severidad !== "todas") {
-  filtros.severidad = req.query.severidad;
-}
-
     const logs = await AuditLog.find(filtros)
       .populate("usuario", "nombre email")
       .sort({ fecha: -1 })
@@ -79,9 +75,6 @@ exports.exportarExcel = async (req, res) => {
     if (req.query.accion) {
       filtros.accion = { $regex: req.query.accion, $options: "i" };
     }
-if (req.query.severidad && req.query.severidad !== "todas") {
-  filtros.severidad = req.query.severidad;
-}
 
     const logs = await AuditLog.find(filtros)
       .sort({ fecha: -1 });
@@ -92,28 +85,28 @@ if (req.query.severidad && req.query.severidad !== "todas") {
 
     const ws = wb.addWorksheet("Auditoría");
 
-    ws.columns = [
+   ws.columns = [
   { header: "Fecha", key: "fecha", width: 22 },
   { header: "Usuario", key: "usuario", width: 28 },
   { header: "Empresa", key: "empresa", width: 28 },
   { header: "Acción", key: "accion", width: 28 },
   { header: "Detalle", key: "detalle", width: 40 },
   { header: "Severidad", key: "severidad", width: 16 },
-  { header: "IP pública", key: "ipPublica", width: 20 },
+  { header: "IP", key: "ip", width: 18 },
   { header: "Ciudad", key: "ciudad", width: 20 },
-  { header: "País", key: "pais", width: 10 }
+  { header: "País", key: "pais", width: 16 }
 ];
 
 
     logs.forEach(l => {
-      ws.addRow({
+     ws.addRow({
   fecha: new Date(l.fecha).toLocaleString(),
   usuario: l.usuario?.nombre || "Sistema",
   empresa: l.empresa?.nombre || "Global",
   accion: l.accion,
   detalle: l.detalle || "",
   severidad: l.severidad,
-  ipPublica: l.ipPublica || "—",
+  ip: l.ip || "—",
   ciudad: l.geo?.ciudad || "—",
   pais: l.geo?.pais || "—"
 });
@@ -172,9 +165,6 @@ if (empresaId) {
     if (req.query.accion) {
       filtros.accion = { $regex: req.query.accion, $options: "i" };
     }
-if (req.query.severidad && req.query.severidad !== "todas") {
-  filtros.severidad = req.query.severidad;
-}
 
     const logs = await AuditLog.find(filtros)
       .populate("usuario", "nombre email")
@@ -318,20 +308,19 @@ if (req.query.severidad && req.query.severidad !== "todas") {
 
       textY += 18;
 
-     // IP + Ubicación
-const ipTexto = l.ipPublica || "—";
-const ciudadTexto = l.geo?.ciudad
-  ? `${l.geo.ciudad}, ${l.geo.pais || ""}`
-  : "Ubicación no disponible";
-
-doc.fontSize(9)
-  .fillColor(gris)
+      // IP
+      doc.fontSize(9).fillColor(gris)
   .text(
-    `IP: ${ipTexto} | ${ciudadTexto}`,
+    `IP: ${l.ip || "—"}${
+      l.geo?.ciudad
+        ? ` | ${l.geo.ciudad}, ${l.geo.pais || ""}`
+        : ""
+    }`,
     60,
     textY,
     { width: 360 }
   );
+
 
       // Severidad (SIN continued)
       doc.font("Helvetica-Bold")
