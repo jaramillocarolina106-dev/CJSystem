@@ -35,6 +35,10 @@ if (empresaId) {
       filtros.accion = { $regex: req.query.accion, $options: "i" };
     }
 
+if (req.query.severidad && req.query.severidad !== "todas") {
+  filtros.severidad = req.query.severidad;
+}
+
     const logs = await AuditLog.find(filtros)
       .populate("usuario", "nombre email")
       .sort({ fecha: -1 })
@@ -75,6 +79,9 @@ exports.exportarExcel = async (req, res) => {
     if (req.query.accion) {
       filtros.accion = { $regex: req.query.accion, $options: "i" };
     }
+if (req.query.severidad && req.query.severidad !== "todas") {
+  filtros.severidad = req.query.severidad;
+}
 
     const logs = await AuditLog.find(filtros)
       .sort({ fecha: -1 });
@@ -92,10 +99,12 @@ exports.exportarExcel = async (req, res) => {
   { header: "Acción", key: "accion", width: 28 },
   { header: "Detalle", key: "detalle", width: 40 },
   { header: "Severidad", key: "severidad", width: 16 },
-  { header: "IP", key: "ip", width: 18 },
+  { header: "IP", key: "ip", width: 22 },
+  { header: "IP Privada", key: "ipPrivada", width: 14 },
   { header: "Ciudad", key: "ciudad", width: 20 },
-  { header: "País", key: "pais", width: 16 }
+  { header: "País", key: "pais", width: 10 }
 ];
+
 
 
     logs.forEach(l => {
@@ -107,9 +116,11 @@ exports.exportarExcel = async (req, res) => {
   detalle: l.detalle || "",
   severidad: l.severidad,
   ip: l.ip || "—",
+  ipPrivada: l.ipPrivada ? "Sí" : "No",
   ciudad: l.geo?.ciudad || "—",
   pais: l.geo?.pais || "—"
 });
+
 
     });
 
@@ -165,6 +176,9 @@ if (empresaId) {
     if (req.query.accion) {
       filtros.accion = { $regex: req.query.accion, $options: "i" };
     }
+if (req.query.severidad && req.query.severidad !== "todas") {
+  filtros.severidad = req.query.severidad;
+}
 
     const logs = await AuditLog.find(filtros)
       .populate("usuario", "nombre email")
@@ -308,19 +322,20 @@ if (empresaId) {
 
       textY += 18;
 
-      // IP
-      doc.fontSize(9).fillColor(gris)
+     // IP + Ubicación
+const ipTexto = l.ip || "—";
+const ciudadTexto = l.geo?.ciudad
+  ? `${l.geo.ciudad}, ${l.geo.pais || ""}`
+  : "Ubicación no disponible";
+
+doc.fontSize(9)
+  .fillColor(gris)
   .text(
-    `IP: ${l.ip || "—"}${
-      l.geo?.ciudad
-        ? ` | ${l.geo.ciudad}, ${l.geo.pais || ""}`
-        : ""
-    }`,
+    `IP: ${ipTexto} | ${ciudadTexto}`,
     60,
     textY,
     { width: 360 }
   );
-
 
       // Severidad (SIN continued)
       doc.font("Helvetica-Bold")
