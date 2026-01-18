@@ -25,25 +25,14 @@ module.exports = async ({ req, accion, detalle, severidad = "media" }) => {
     const severidadFinal =
       severidadPorAccion[accionFinal] || severidad;
 
-    /* =========================
-       🌐 IP REAL DEL CLIENTE
-    ========================= */
-    let ip = getRealClientIP(req);
-
-if (typeof ip === "string" && ip.startsWith("::ffff:")) {
-  ip = ip.replace("::ffff:", "");
-}
-
-const ipRaw =
-  req.headers["x-forwarded-for"] ||
-  req.socket?.remoteAddress ||
-  "—";
+      const { ip, isPrivate } = getRealClientIP(req);
 
 
     /* =========================
        🌍 GEOLOCALIZACIÓN
     ========================= */
-    const geo = getGeoFromIP(ip);
+   const geo = ip && !isPrivate ? getGeoFromIP(ip) : null;
+
 
     /* =========================
        🧠 USER AGENT
@@ -93,10 +82,10 @@ const ipRaw =
   usuario: usuarioData,
   empresa: empresaData,
 
-  ipPublica: ip || "—",
-  ipRaw: ipRaw || "—",
+ ip,
+ipPrivada: isPrivate,
+geo,
 
-  geo: geo || null,
 
   userAgent
 });

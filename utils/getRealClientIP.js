@@ -19,36 +19,17 @@ module.exports = function getRealClientIP(req) {
     return false;
   };
 
-  /* =================================================
-     🔥 1️⃣ CLOUDFARE (PRIORIDAD MÁXIMA)
-  ================================================= */
-  const cfIp = req.headers["cf-connecting-ip"];
-  if (cfIp && !isPrivateIPv4(cfIp)) {
-    return normalize(cfIp);
-  }
+  const rawIP =
+    req.headers["cf-connecting-ip"] ||
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.ip ||
+    req.socket?.remoteAddress ||
+    null;
 
-  /* =================================================
-     🔥 2️⃣ PROXY ESTÁNDAR
-  ================================================= */
-  const xff = req.headers["x-forwarded-for"];
-  if (xff) {
-    const ips = xff
-      .split(",")
-      .map(ip => normalize(ip.trim()))
-      .filter(ip => !isPrivateIPv4(ip));
+  const ip = normalize(rawIP);
 
-    if (ips.length > 0) {
-      return ips[0];
-    }
-  }
-
-  /* =================================================
-     🔁 3️⃣ FALLBACK DIRECTO
-  ================================================= */
-  const fallback = normalize(req.ip);
-  if (!isPrivateIPv4(fallback)) {
-    return fallback;
-  }
-
-  return null;
+  return {
+    ip,
+    isPrivate: isPrivateIPv4(ip)
+  };
 };
