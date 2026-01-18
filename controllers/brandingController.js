@@ -19,8 +19,10 @@ exports.guardarBranding = async (req, res) => {
       "branding.colorSecundario": req.body.colorSecundario
     };
 
+    // ✅ LOGO CON MEMORY STORAGE
     if (req.file) {
-      update["branding.logoPath"] = `/uploads/${req.file.filename}`;
+      const base64Logo = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+      update["branding.logoPath"] = base64Logo;
     }
 
     await Empresa.findByIdAndUpdate(
@@ -36,8 +38,6 @@ exports.guardarBranding = async (req, res) => {
     res.status(500).json({ msg: "Error guardando branding" });
   }
 };
-
-
 /* =====================================================
    🎨 OBTENER BRANDING (SIEMPRE DEVUELVE ALGO)
 ===================================================== */
