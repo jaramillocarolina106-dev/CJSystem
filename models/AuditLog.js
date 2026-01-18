@@ -42,22 +42,26 @@ const auditLogSchema = new mongoose.Schema(
       nombre: String
     },
 
-    ip: {
-      type: String,
-      default: "—"
-    },
-ipRaw: {
+ ip: {
   type: String,
-  default: "—"
+  default: null,
+  index: true
 },
+
+ipPrivada: {
+  type: Boolean,
+  default: false,
+  index: true
+},
+
+
 geo: {
-  ciudad: String,
   pais: String,
   region: String,
-  fuente: {
-    type: String,
-    default: "frontend"
-  }
+  ciudad: String,
+  lat: Number,
+  lon: Number,
+  timezone: String
 },
 
     userAgent: {
@@ -83,5 +87,8 @@ geo: {
 auditLogSchema.index({ "empresa.id": 1, fecha: -1 });
 auditLogSchema.index({ "usuario.id": 1, fecha: -1 });
 auditLogSchema.index({ ip: 1, fecha: -1 });
+auditLogSchema.index({ ipPrivada: 1, fecha: -1 });
+
+
 
 module.exports = mongoose.model("AuditLog", auditLogSchema);
