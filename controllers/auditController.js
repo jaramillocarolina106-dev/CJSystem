@@ -27,8 +27,18 @@ if (empresaId) {
 
     if (req.query.desde || req.query.hasta) {
       filtros.fecha = {};
-      if (req.query.desde) filtros.fecha.$gte = new Date(req.query.desde);
-      if (req.query.hasta) filtros.fecha.$lte = new Date(req.query.hasta);
+      if (req.query.desde) {
+  const d = new Date(req.query.desde);
+  d.setHours(0, 0, 0, 0);
+  filtros.fecha.$gte = d;
+}
+
+if (req.query.hasta) {
+  const h = new Date(req.query.hasta);
+  h.setHours(23, 59, 59, 999);
+  filtros.fecha.$lte = h;
+}
+
     }
 
     if (req.query.accion) {
